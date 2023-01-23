@@ -1,6 +1,6 @@
+use crate::{ClockingItem, ClockingItemId, ClockingStore, Result};
 use chrono::prelude::*;
 use rusqlite::Connection;
-use crate::{ClockingItem, ClockingItemId, ClockingStore, Result};
 
 pub struct SqliteStore {
     conn: Connection,
@@ -9,12 +9,11 @@ pub struct SqliteStore {
 pub const IN_MEMORY: &str = ":memory:";
 impl SqliteStore {
     pub fn new(p: &str) -> Self {
-        let conn =
-            if p == IN_MEMORY {
-                Connection::open_in_memory().expect("Should be able to open in memory sqlite.")
-            } else {
-                Connection::open(p).expect("Falied to open sqlite at specified location.")
-            };
+        let conn = if p == IN_MEMORY {
+            Connection::open_in_memory().expect("Should be able to open in memory sqlite.")
+        } else {
+            Connection::open(p).expect("Falied to open sqlite at specified location.")
+        };
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS clocking (
@@ -25,9 +24,10 @@ impl SqliteStore {
                 notes TEXT NULL
              )",
             (),
-        ).expect("Initialize table failed.");
+        )
+        .expect("Initialize table failed.");
 
-        SqliteStore{conn}
+        SqliteStore { conn }
     }
 }
 
@@ -36,7 +36,7 @@ impl ClockingStore for SqliteStore {
         let item = ClockingItem {
             id: ClockingItemId {
                 title: title.to_string(),
-                start:  Utc::now(),
+                start: Utc::now(),
             },
             end: None,
             notes: String::new(),
@@ -54,20 +54,32 @@ impl ClockingStore for SqliteStore {
         match self.conn.query_row(
             "SELECT id FROM clocking WHERE title = ? and start = ?",
             [&item.id.title, &start_time_string],
-            |_row| Ok(())) {
-            Ok(()) => { println!("Existed..."); false },
+            |_row| Ok(()),
+        ) {
+            Ok(()) => {
+                println!("Existed...");
+                false
+            }
             Err(rusqlite::Error::QueryReturnedNoRows) => {
-                match self.conn.execute("INSERT INTO clocking (title, start, notes) VALUES(?, ?, ?)",
-                             [&item.id.title, &start_time_string, &item.notes]) {
-                    Ok(1)  => true,
-                    Ok(inserted) => {println!("abnormal inserted count: {}", inserted); false},
-                    Err(err) => {println!("Insert failed: {}", err); false },
+                match self.conn.execute(
+                    "INSERT INTO clocking (title, start, notes) VALUES(?, ?, ?)",
+                    [&item.id.title, &start_time_string, &item.notes],
+                ) {
+                    Ok(1) => true,
+                    Ok(inserted) => {
+                        println!("abnormal inserted count: {}", inserted);
+                        false
+                    }
+                    Err(err) => {
+                        println!("Insert failed: {}", err);
+                        false
+                    }
                 }
-            },
+            }
             Err(other_err) => {
                 println!("Error when query existing item: {}", other_err);
                 false
-            },
+            }
         }
     }
     fn finish_clocking(&mut self, id: &ClockingItemId, notes: &str) -> bool {
@@ -75,7 +87,12 @@ impl ClockingStore for SqliteStore {
         self.finish_clocking_item(id, &end, notes)
     }
 
-    fn finish_clocking_item(&mut self, id: &ClockingItemId, end: &DateTime<Utc>, notes: &str) -> bool {
+    fn finish_clocking_item(
+        &mut self,
+        id: &ClockingItemId,
+        end: &DateTime<Utc>,
+        notes: &str,
+    ) -> bool {
         let start_string = id.start.to_rfc3339();
         let end_string = end.to_rfc3339();
         match self.conn.execute("UPDATE clocking SET end = ?, notes = IFNULL(notes, '')||?  WHERE title = ? and start = ? and end IS NULL",
@@ -86,26 +103,36 @@ impl ClockingStore for SqliteStore {
         }
     }
 
-    fn query_clocking(&self, start: &DateTime<Utc>, end: Option<DateTime<Utc>>) -> Vec<ClockingItem> {
+    fn query_clocking(
+        &self,
+        start: &DateTime<Utc>,
+        end: Option<DateTime<Utc>>,
+    ) -> Vec<ClockingItem> {
         let start_string = start.to_rfc3339();
         let end_string = end.map_or_else(|| Utc::now().to_rfc3339(), |x| x.to_rfc3339());
         let mut stmt = self.conn.prepare(
-            "SELECT title, start, end, notes from clocking where start >= ? and end is not null and end <= ? ").expect("Should be able to prepare statement.");
+            "SELECT title, start, end, notes from clocking where start >= ? and end is not null and end <= ? order by start ").expect("Should be able to prepare statement.");
         stmt.query_map([&start_string, &end_string], |row| {
             let start_string: String = row.get(1).unwrap();
             let end_string: Option<String> = row.get(2).unwrap();
             Ok(ClockingItem {
                 id: ClockingItemId {
                     title: row.get(0).unwrap(),
-                    start: DateTime::parse_from_rfc3339(&start_string).unwrap().with_timezone(&Utc),
+                    start: DateTime::parse_from_rfc3339(&start_string)
+                        .unwrap()
+                        .with_timezone(&Utc),
                 },
-                end: end_string
-                    .map(|end_str| DateTime::parse_from_rfc3339(&end_str).unwrap().with_timezone(&Utc)),
+                end: end_string.map(|end_str| {
+                    DateTime::parse_from_rfc3339(&end_str)
+                        .unwrap()
+                        .with_timezone(&Utc)
+                }),
                 notes: row.get(3).unwrap(),
             })
-        }).unwrap()
-            .map(|x| x.unwrap())
-            .collect()
+        })
+        .unwrap()
+        .map(|x| x.unwrap())
+        .collect()
     }
 }
 
@@ -118,23 +145,38 @@ mod tests {
         let mut mem_store = SqliteStore::new(IN_MEMORY);
         let start_time = Utc::now();
         let item = ClockingItem {
-            id: ClockingItemId {title: "The Program".to_string(), start: start_time.clone()},
+            id: ClockingItemId {
+                title: "The Program".to_string(),
+                start: start_time.clone(),
+            },
             end: None,
             notes: String::new(),
         };
 
         assert_eq!(mem_store.start_clocking_item(&item), true);
         // add again
-        assert_eq!(mem_store.start_clocking_item(&item), false, "Adding the same item twice should fail.");
+        assert_eq!(
+            mem_store.start_clocking_item(&item),
+            false,
+            "Adding the same item twice should fail."
+        );
 
         let in_store_items = mem_store.query_clocking(&start_time, None);
-        assert_eq!(in_store_items.len(), 0, "Unfinished items should not included in query.");
+        assert_eq!(
+            in_store_items.len(),
+            0,
+            "Unfinished items should not included in query."
+        );
 
         let end = Utc::now();
         let note = "A note";
         assert_eq!(mem_store.finish_clocking_item(&item.id, &end, &note), true);
         //finish again
-        assert_eq!(mem_store.finish_clocking_item(&item.id, &end, &note), false, "call finish_clocking_item on finished item should fail");
+        assert_eq!(
+            mem_store.finish_clocking_item(&item.id, &end, &note),
+            false,
+            "call finish_clocking_item on finished item should fail"
+        );
 
         let in_store_items = mem_store.query_clocking(&start_time, None);
         assert_eq!(in_store_items.len(), 1);
@@ -167,7 +209,7 @@ mod tests {
         let indices = [1, 3, 4];
         let end_data = gen_end_data(&items, &indices);
         let add_note = "New note";
-        for(end_item, end_time) in end_data.iter() {
+        for (end_item, end_time) in end_data.iter() {
             assert!(mem_store.finish_clocking_item(&end_item.id, &end_time, add_note));
         }
 
@@ -192,26 +234,34 @@ mod tests {
 
     fn gen_items(count: usize) -> Vec<ClockingItem> {
         let five_mins = chrono::Duration::minutes(5);
-        (0..count).map(|i| {
-            let start_offset = chrono::Duration::days((count - i - 1) as i64) + five_mins;
-            ClockingItem {
-                id: ClockingItemId {
-                    title: format!("Item {i}"),
-                    start:Utc::now().checked_sub_signed(start_offset).unwrap(),
-                },
-                end: None,
-                notes: format!("Init notes for item {i}\n"),
-            }
-        }).collect()
+        (0..count)
+            .map(|i| {
+                let start_offset = chrono::Duration::days((count - i - 1) as i64) + five_mins;
+                ClockingItem {
+                    id: ClockingItemId {
+                        title: format!("Item {i}"),
+                        start: Utc::now().checked_sub_signed(start_offset).unwrap(),
+                    },
+                    end: None,
+                    notes: format!("Init notes for item {i}\n"),
+                }
+            })
+            .collect()
     }
 
-    fn gen_end_data<'a>(source: &'a [ClockingItem], indices: &[usize]) -> Vec<(&'a ClockingItem, DateTime<Utc>)> {
+    fn gen_end_data<'a>(
+        source: &'a [ClockingItem],
+        indices: &[usize],
+    ) -> Vec<(&'a ClockingItem, DateTime<Utc>)> {
         let five_mins = chrono::Duration::minutes(5);
-        indices.iter().map(|i| {
-            let item = &source[*i];
-            let end = item.id.start.checked_add_signed(five_mins).unwrap();
-            (item, end)
-        }).collect()
+        indices
+            .iter()
+            .map(|i| {
+                let item = &source[*i];
+                let end = item.id.start.checked_add_signed(five_mins).unwrap();
+                (item, end)
+            })
+            .collect()
     }
 
     fn gen_expected_item(item: &ClockingItem, new_note: &str) -> ClockingItem {
@@ -219,7 +269,12 @@ mod tests {
         final_notes.push_str(new_note);
         ClockingItem {
             id: item.id.clone(),
-            end: Some(item.id.start.checked_add_signed(chrono::Duration::minutes(5)).unwrap()),
+            end: Some(
+                item.id
+                    .start
+                    .checked_add_signed(chrono::Duration::minutes(5))
+                    .unwrap(),
+            ),
             notes: final_notes,
         }
     }
