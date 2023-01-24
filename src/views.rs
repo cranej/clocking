@@ -73,6 +73,18 @@ impl ItemAgg {
             .reduce(|acc, e| acc + e)
             .unwrap()
     }
+
+    fn daily_summary(&self) -> HashMap<NaiveDate, chrono::Duration> {
+        let mut map: HashMap<NaiveDate, chrono::Duration> = HashMap::new();
+        for eff in self.efforts.iter() {
+            let start_date = eff.start.date_naive();
+            map.entry(start_date)
+                .and_modify(|dur| *dur = *dur + eff.span())
+                .or_insert(eff.span());
+        }
+
+        map
+    }
 }
 
 #[derive(Debug)]
@@ -114,6 +126,85 @@ impl ItemView {
         ItemView {
             agg_list: view_map.into_values().collect(),
         }
+    }
+
+    fn daily_view(&self) -> HashMap<NaiveDate, chrono::Duration> {
+        let mut daily_view: HashMap<NaiveDate, chrono::Duration> = HashMap::new();
+        for agg_summary in self.agg_list.iter().map(|agg| agg.daily_summary()) {
+            for (date, duration) in agg_summary.iter() {
+                daily_view
+                    .entry(*date)
+                    .and_modify(|dur| *dur = *dur + *duration)
+                    .or_insert(*duration);
+            }
+        }
+
+        daily_view
+    }
+
+    fn daily_view_detail(&self) -> HashMap<NaiveDate, HashMap<String, chrono::Duration>> {
+        let mut daily_view: HashMap<NaiveDate, HashMap<String, chrono::Duration>> = HashMap::new();
+        for (title, agg_summary) in self
+            .agg_list
+            .iter()
+            .map(|agg| (&agg.title, agg.daily_summary()))
+        {
+            for (date, duration) in agg_summary.iter() {
+                daily_view
+                    .entry(*date)
+                    .and_modify(|item_group| {
+                        item_group
+                            .entry(title.to_string())
+                            .and_modify(|dur| *dur = *dur + *duration)
+                            .or_insert(*duration);
+                    })
+                    .or_insert_with(|| {
+                        let mut map: HashMap<String, chrono::Duration> = HashMap::new();
+                        map.insert(title.to_string(), *duration);
+                        map
+                    });
+            }
+        }
+
+        daily_view
+    }
+
+    pub fn daily_summary(&self) -> String {
+        let mut r = String::new();
+        let mut daily_total = chrono::Duration::days(0);
+        let daily_view = self.daily_view();
+        for (date, duration) in daily_view.iter() {
+            r.push_str(&format!("{}: {}\n", date, strify_duration(duration)));
+            daily_total = daily_total + *duration;
+        }
+
+        if daily_view.len() > 1 {
+            r.push_str(&format!("Total: {}\n", strify_duration(&daily_total)));
+        }
+        r
+    }
+
+    pub fn daily_summary_detail(&self) -> String {
+        let mut r = String::new();
+        let mut total_duration = chrono::Duration::days(0);
+        let daily_view = self.daily_view_detail();
+        for (date, detail) in daily_view.iter() {
+            r.push_str(&format!("{date}: \n"));
+            let mut daily_total = chrono::Duration::days(0);
+            for (title, duration) in detail.iter() {
+                r.push_str(&format!("\t{title}: {}\n", strify_duration(duration)));
+                daily_total = daily_total + *duration;
+            }
+            r.push_str(&format!(
+                "\tDaily Total: {}\n",
+                strify_duration(&daily_total)
+            ));
+            total_duration = total_duration + daily_total;
+        }
+        if daily_view.len() > 1 {
+            r.push_str(&format!("Total: {}\n", strify_duration(&total_duration)));
+        }
+        r
     }
 }
 

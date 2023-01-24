@@ -31,6 +31,12 @@ enum Commands {
         #[arg(short, long)]
         days: Option<u64>,
         ///<Unimplemented yet>.
+        ///Show daily summary
+        #[arg(long = "daily")]
+        daily_summary: bool,
+        ///Show daily summary with summary of each item
+        #[arg(long = "daily-detail")]
+        daily_summary_detail: bool,
         #[arg(long)]
         filter: Option<String>,
     },
@@ -56,14 +62,27 @@ fn main() {
             let notes = read_until();
             store.finish_clocking(&id, &notes);
         }
-        Commands::Report { from, days, .. } => {
+        Commands::Report {
+            from,
+            days,
+            daily_summary,
+            daily_summary_detail,
+            ..
+        } => {
             let tail_offset = from.unwrap_or(0);
             let (start, end) = query_start_end(tail_offset, days);
 
             // dbg!(start, end);
             let items = store.query_clocking(&start, Some(end));
             let view = clocking::views::ItemView::new(&items);
-            println!("{view}");
+
+            if daily_summary {
+                println!("{}", &view.daily_summary());
+            } else if daily_summary_detail {
+                println!("{}", &view.daily_summary_detail());
+            } else {
+                println!("{view}");
+            }
         }
     }
 }
