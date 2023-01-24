@@ -46,6 +46,7 @@ pub trait ClockingStore {
     fn start_clocking(&mut self, title: &str) -> Result<ClockingItemId>;
     fn start_clocking_item(&mut self, item: &ClockingItem) -> bool;
     fn finish_clocking(&mut self, id: &ClockingItemId, notes: &str) -> bool;
+    fn finish_latest_unfinished_by_title(&mut self, title: &str, notes: &str) -> Result<bool>;
     fn finish_clocking_item(
         &mut self,
         id: &ClockingItemId,

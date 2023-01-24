@@ -106,6 +106,23 @@ impl ClockingStore for SqliteStore {
         self.finish_clocking_item(id, &end, notes)
     }
 
+    fn finish_latest_unfinished_by_title(&mut self, title: &str, notes: &str) -> Result<bool> {
+        let end_string = Utc::now().to_rfc3339();
+        self.conn
+            .execute(
+                "UPDATE clocking set end = ?, notes = IFNULL(notes, '')||? where id in (
+                    SELECT max(id) FROM clocking WHERE end is NULL and title = ?
+            )",
+                [&end_string, notes, title],
+            )
+            .map_err(|e| e.to_string())
+            .and_then(|n| match n {
+                0 => Ok(false),
+                1 => Ok(true),
+                _ => Err(format!("{n} rows updated! should be 1...")),
+            })
+    }
+
     fn finish_clocking_item(
         &mut self,
         id: &ClockingItemId,
@@ -242,6 +259,48 @@ mod tests {
         let query_result = mem_store.query_clocking(&items[2].id.start, Some(items[4].id.start));
         assert_eq!(query_result.len(), 1);
         assert_eq!(query_result[0], gen_expected_item(&items[3], add_note));
+    }
+
+    #[test]
+    fn test_finised_unfinished_by_title() {
+        let mut mem_store = SqliteStore::new(IN_MEMORY);
+        let mut items = gen_items(6);
+        assert_eq!(items.len(), 6);
+        items[2].id.title = "Item 0".to_string();
+        items[3].id.title = "Item 1".to_string();
+        items[4].id.title = "Item 0".to_string();
+        items[5].id.title = "Item 1".to_string();
+        // now there are there Item 0 and there Item 1 in collection
+        for item in items.iter() {
+            assert!(mem_store.start_clocking_item(item));
+        }
+
+        //finish the fouth 1 , which is a "Item 1"
+        assert_eq!(&items[3].id.title, "Item 1");
+        assert!(mem_store.finish_clocking(&items[3].id, ""));
+
+        let r = mem_store.finish_latest_unfinished_by_title("Item 1", "");
+        assert_eq!(Ok(true), r);
+
+        // finish all 'Item 0'
+        let indices: &[usize] = &[0, 2, 4];
+        for i in indices.iter() {
+            assert_eq!(&items[*i].id.title, "Item 0");
+        }
+        let end_data = gen_end_data(&items, &indices);
+        for (end_item, end_time) in end_data.iter() {
+            assert!(mem_store.finish_clocking_item(&end_item.id, &end_time, ""));
+        }
+
+        // try finish Item 0 by title
+        let r = mem_store.finish_latest_unfinished_by_title("Item 0", "");
+        assert_eq!(Ok(false), r);
+
+        // try finish non-exist title
+        assert_eq!(
+            Ok(false),
+            mem_store.finish_latest_unfinished_by_title("non-exists", "")
+        );
     }
 
     fn gen_items(count: usize) -> Vec<ClockingItem> {

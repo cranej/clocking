@@ -21,8 +21,16 @@ struct Cli {
 enum Commands {
     Start {
         title: String,
+        /// Do not wait for notes input, exit with unfinished status.
+        #[arg(short, long)]
+        no_wait: bool,
     },
-
+    Finish {
+        title: String,
+        /// can be specified multiple times, each as a separate line. Sinel value '-' means read from stdin
+        #[arg(short, long)]
+        notes: Vec<String>,
+    },
     Report {
         ///Tail offset. Default to 0 - today
         #[arg(short, long)]
@@ -40,7 +48,6 @@ enum Commands {
         #[arg(long)]
         filter: Option<String>,
     },
-
     /// Details of latest record of item 'title'.
     Latest {
         /// Title of the item to display.
@@ -60,13 +67,28 @@ fn main() {
     let mut store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
 
     match cli.command {
-        Commands::Start { title } => {
+        Commands::Start { title, no_wait } => {
             let id = store
                 .start_clocking(&title)
                 .expect("Failed to start clocking");
-            // read notes
-            let notes = read_until();
-            store.finish_clocking(&id, &notes);
+
+            if !no_wait {
+                let notes = read_until();
+                store.finish_clocking(&id, &notes);
+            };
+        }
+        Commands::Finish { title, notes } => {
+            let notes = if notes.len() == 1 && notes[0] == "-" {
+                read_until()
+            } else {
+                notes.join("\n")
+            };
+
+            match store.finish_latest_unfinished_by_title(&title, &notes) {
+                Ok(true) => println!("Updated."),
+                Ok(false) => println!("No unfinished item found by {title}"),
+                Err(e) => eprintln!("Unexpected error: {e}"),
+            }
         }
         Commands::Report {
             from,
@@ -116,28 +138,10 @@ fn query_start_end(days_offset: u64, days: Option<u64>) -> (DateTime<Utc>, DateT
 
 fn read_until() -> String {
     let mut buf = String::new();
-    while let Ok(go_on) = read_line(&mut buf) {
-        if !go_on {
+    while let Ok(n) = io::stdin().read_line(&mut buf) {
+        if n == 0 {
             break;
         }
     }
-
     buf
-}
-
-const STOP_SIGN: &str = ":q";
-fn read_line(buf: &mut String) -> Result<bool, std::io::Error> {
-    let mut line = String::new();
-    match io::stdin().read_line(&mut line) {
-        Ok(n) if n > 0 => {
-            if line.starts_with(STOP_SIGN) {
-                Ok(false)
-            } else {
-                buf.push_str(&line);
-                Ok(true)
-            }
-        }
-        Ok(_) => Ok(false),
-        Err(e) => Err(e),
-    }
 }
