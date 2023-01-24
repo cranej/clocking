@@ -30,13 +30,13 @@ enum Commands {
         ///Limit days from tail offset. Default to until now
         #[arg(short, long)]
         days: Option<u64>,
-        ///<Unimplemented yet>.
         ///Show daily summary
         #[arg(long = "daily")]
         daily_summary: bool,
-        ///Show daily summary with summary of each item
-        #[arg(long = "daily-detail")]
-        daily_summary_detail: bool,
+        ///Show detail report
+        #[arg(long)]
+        detail: bool,
+        ///<Unimplemented yet>.
         #[arg(long)]
         filter: Option<String>,
     },
@@ -72,7 +72,7 @@ fn main() {
             from,
             days,
             daily_summary,
-            daily_summary_detail,
+            detail,
             ..
         } => {
             let tail_offset = from.unwrap_or(0);
@@ -84,10 +84,10 @@ fn main() {
 
             if daily_summary {
                 println!("{}", &view.daily_summary());
-            } else if daily_summary_detail {
-                println!("{}", &view.daily_summary_detail());
-            } else {
+            } else if detail {
                 println!("{view}");
+            } else {
+                println!("{}", &view.daily_summary_detail());
             }
         }
         Commands::Latest { title } => match store.latest(&title) {
