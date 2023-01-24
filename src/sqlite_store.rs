@@ -29,6 +29,25 @@ impl SqliteStore {
 
         SqliteStore { conn }
     }
+
+    fn row_to_item(row: &rusqlite::Row<'_>) -> ClockingItem {
+        let start_string: String = row.get("start").unwrap();
+        let end_string: Option<String> = row.get("end").unwrap();
+        ClockingItem {
+            id: ClockingItemId {
+                title: row.get("title").unwrap(),
+                start: DateTime::parse_from_rfc3339(&start_string)
+                    .unwrap()
+                    .with_timezone(&Utc),
+            },
+            end: end_string.map(|end_str| {
+                DateTime::parse_from_rfc3339(&end_str)
+                    .unwrap()
+                    .with_timezone(&Utc)
+            }),
+            notes: row.get("notes").unwrap(),
+        }
+    }
 }
 
 impl ClockingStore for SqliteStore {
@@ -113,26 +132,19 @@ impl ClockingStore for SqliteStore {
         let mut stmt = self.conn.prepare(
             "SELECT title, start, end, notes from clocking where start >= ? and end is not null and end <= ? order by start ").expect("Should be able to prepare statement.");
         stmt.query_map([&start_string, &end_string], |row| {
-            let start_string: String = row.get(1).unwrap();
-            let end_string: Option<String> = row.get(2).unwrap();
-            Ok(ClockingItem {
-                id: ClockingItemId {
-                    title: row.get(0).unwrap(),
-                    start: DateTime::parse_from_rfc3339(&start_string)
-                        .unwrap()
-                        .with_timezone(&Utc),
-                },
-                end: end_string.map(|end_str| {
-                    DateTime::parse_from_rfc3339(&end_str)
-                        .unwrap()
-                        .with_timezone(&Utc)
-                }),
-                notes: row.get(3).unwrap(),
-            })
+            Ok(SqliteStore::row_to_item(row))
         })
         .unwrap()
         .map(|x| x.unwrap())
         .collect()
+    }
+
+    fn latest(&self, title: &str) -> Option<ClockingItem> {
+        self.conn.query_row(
+            "SELECT title, start, end, notes from clocking where title = ? and end is not null order by start desc limit 1",
+            [title],
+            |row| Ok(SqliteStore::row_to_item(row)))
+            .ok()
     }
 }
 

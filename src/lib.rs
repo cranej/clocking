@@ -17,18 +17,22 @@ pub struct ClockingItem {
     notes: String,
 }
 
+const TIME_FORMAT: &str = "%Y-%m-%d %a %H:%M";
 impl fmt::Display for ClockingItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r = writeln!(f, "{}:", &self.id.title).and(writeln!(
             f,
-            "\tStart: {}",
-            self.id.start.to_rfc3339()
+            "\t{} ~ {}",
+            self.id.start.with_timezone(&Local).format(TIME_FORMAT),
+            self.end
+                .map(|e| e.with_timezone(&Local).format(TIME_FORMAT).to_string())
+                .unwrap_or_else(|| "Unfinished".to_string()),
         ));
 
         if !self.notes.is_empty() {
             r = r.and(writeln!(f, "\tNotes:"));
             for line in self.notes.lines() {
-                r = r.and(writeln!(f, "\t\t{line}"));
+                r = r.and_then(|_| writeln!(f, "\t  {line}"));
             }
         }
 
@@ -53,4 +57,5 @@ pub trait ClockingStore {
         start: &DateTime<Utc>,
         end: Option<DateTime<Utc>>,
     ) -> Vec<ClockingItem>;
+    fn latest(&self, title: &str) -> Option<ClockingItem>;
 }

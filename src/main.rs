@@ -40,6 +40,12 @@ enum Commands {
         #[arg(long)]
         filter: Option<String>,
     },
+
+    /// Details of latest record of item 'title'.
+    Latest {
+        /// Title of the item to display.
+        title: String,
+    },
 }
 
 const STORE_FILE_VAR: &str = "CLOCKING_FILE";
@@ -84,6 +90,10 @@ fn main() {
                 println!("{view}");
             }
         }
+        Commands::Latest { title } => match store.latest(&title) {
+            Some(item) => println!("{item}"),
+            None => println!("Not found"),
+        },
     }
 }
 
