@@ -59,4 +59,5 @@ pub trait ClockingStore {
         end: Option<DateTime<Utc>>,
     ) -> Vec<ClockingItem>;
     fn latest(&self, title: &str) -> Option<ClockingItem>;
+    fn recent_titles(&self, count: usize) -> Vec<String>;
 }

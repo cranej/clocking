@@ -5,7 +5,7 @@
 - [x] support daily view
 - [x] finish latest unfinished work
 - [ ] web server mode
-- [ ] list recent work names when starting clocking
+- [x] list recent work names when starting clocking
 - [ ] report weekly view
 - [ ] support filtering item name when reporting
 - [ ] add tags for item

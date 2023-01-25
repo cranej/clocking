@@ -1,12 +1,13 @@
 [package]
 name = "clocking"
-version = "0.5.0"
+version = "0.6.0"
+description = "A time hacking tool."
 edition = "2021"
-authors = ["Crane Jin<crane@cranejin.com>"]
+authors = ["Crane Jin <crane@cranejin.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 chrono = { version = "0.4.23", features = ["std", "clock"] }
-clap = { version = "4.1.1", features = ["derive"] }
+clap = { version = "4.1.1", features = ["derive", "cargo"] }
 rusqlite = { version = "0.28.0", features = ["bundled"] }

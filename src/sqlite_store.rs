@@ -163,6 +163,17 @@ impl ClockingStore for SqliteStore {
             |row| Ok(SqliteStore::row_to_item(row)))
             .ok()
     }
+
+    fn recent_titles(&self, count: usize) -> Vec<String> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT DISTINCT title FROM clocking order by start desc limit ?")
+            .expect("Should be able to prepare statment.");
+        stmt.query_map([count], |row| Ok(row.get("title").unwrap()))
+            .unwrap()
+            .map(|x| x.unwrap())
+            .collect()
+    }
 }
 
 #[cfg(test)]
