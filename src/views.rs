@@ -61,7 +61,7 @@ impl fmt::Display for ItemAgg {
         for eff in self.efforts.iter() {
             r = r.and_then(|_| writeln!(f, "\t{}", eff));
         }
-        r.and_then(|_| writeln!(f, "\tTotal: {}", strify_duration(&self.total_span())))
+        r.and_then(|_| writeln!(f, "\t(Total): {}", strify_duration(&self.total_span())))
     }
 }
 
@@ -179,7 +179,7 @@ impl ItemView {
         }
 
         if daily_view.len() > 1 {
-            r.push_str(&format!("Total: {}\n", strify_duration(&daily_total)));
+            r.push_str(&format!("(Total): {}\n", strify_duration(&daily_total)));
         }
         r
     }
@@ -195,14 +195,11 @@ impl ItemView {
                 r.push_str(&format!("\t{title}: {}\n", strify_duration(duration)));
                 daily_total = daily_total + *duration;
             }
-            r.push_str(&format!(
-                "\tDaily Total: {}\n",
-                strify_duration(&daily_total)
-            ));
+            r.push_str(&format!("\t(Total): {}\n\n", strify_duration(&daily_total)));
             total_duration = total_duration + daily_total;
         }
         if daily_view.len() > 1 {
-            r.push_str(&format!("Total: {}\n", strify_duration(&total_duration)));
+            r.push_str(&format!("(Total): {}\n", strify_duration(&total_duration)));
         }
         r
     }

@@ -91,10 +91,12 @@ fn main() {
                     let id = store
                         .start_clocking(&title)
                         .expect("Failed to start clocking");
-
+                    println!("(Started)");
                     if !no_wait {
+                        println!("(Wait for notes, Ctrl-D to finish input)");
                         let notes = read_to_end();
                         store.finish_clocking(&id, &notes);
+                        println!("(Finished)");
                     };
                 }
                 Err(e) => {
@@ -110,8 +112,8 @@ fn main() {
             };
 
             match store.finish_latest_unfinished_by_title(&title, &notes) {
-                Ok(true) => println!("Updated."),
-                Ok(false) => println!("No unfinished item found by {title}"),
+                Ok(true) => println!("(Updated)"),
+                Ok(false) => println!("(No unfinished item found by {title})"),
                 Err(e) => eprintln!("Unexpected error: {e}"),
             }
         }
@@ -139,7 +141,7 @@ fn main() {
         }
         Commands::Latest { title } => match store.latest(&title) {
             Some(item) => println!("{item}"),
-            None => println!("Not found"),
+            None => println!("(Not found)"),
         },
     }
 }
@@ -208,6 +210,7 @@ fn read_or_panic() -> String {
     let mut buf = String::new();
     match io::stdin().read_line(&mut buf) {
         Ok(n) if n > 0 => buf,
+        Ok(n) if n == 0 => buf,
         Ok(n) => panic!("Unexpected read bytes: {n}"),
         Err(e) => panic!("Unexpected read error: {e}"),
     }
