@@ -1,16 +1,18 @@
 use chrono::prelude::*;
+use serde::Serialize;
 use std::fmt;
 
+pub mod server;
 pub mod sqlite_store;
 pub mod views;
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(Serialize, PartialEq, Clone, Debug)]
 pub struct ClockingItemId {
     title: String,
     start: DateTime<Utc>,
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(Serialize, PartialEq, Clone, Debug)]
 pub struct ClockingItem {
     id: ClockingItemId,
     end: Option<DateTime<Utc>>,
@@ -59,5 +61,6 @@ pub trait ClockingStore {
         end: Option<DateTime<Utc>>,
     ) -> Vec<ClockingItem>;
     fn latest(&self, title: &str) -> Option<ClockingItem>;
-    fn recent_titles(&self, count: usize) -> Vec<String>;
+    fn recent_titles(&self, limit: usize) -> Vec<String>;
+    fn unfinished(&self, limit: usize) -> Vec<ClockingItemId>;
 }

@@ -164,15 +164,36 @@ impl ClockingStore for SqliteStore {
             .ok()
     }
 
-    fn recent_titles(&self, count: usize) -> Vec<String> {
+    fn recent_titles(&self, limit: usize) -> Vec<String> {
         let mut stmt = self
             .conn
             .prepare("SELECT title, max(start) FROM clocking group by title order by max(start) desc limit ?")
             .expect("Should be able to prepare statment.");
-        stmt.query_map([count], |row| Ok(row.get("title").unwrap()))
+        stmt.query_map([limit], |row| Ok(row.get("title").unwrap()))
             .unwrap()
             .map(|x| x.unwrap())
             .collect()
+    }
+
+    fn unfinished(&self, limit: usize) -> Vec<ClockingItemId> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "select title, start from clocking where end is null order by start desc limit ?",
+            )
+            .expect("Should be able to prepare statment.");
+        stmt.query_map([limit], |row| {
+            let start_string: String = row.get("start").unwrap();
+            Ok(ClockingItemId {
+                title: row.get("title").unwrap(),
+                start: DateTime::parse_from_rfc3339(&start_string)
+                    .unwrap()
+                    .with_timezone(&Utc),
+            })
+        })
+        .unwrap()
+        .map(|x| x.unwrap())
+        .collect()
     }
 }
 

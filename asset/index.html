@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8"/>
+    <script src="./vue.js"></script>
+    <link href="./pure-min.css" rel="stylesheet"/>
+    <link href="./style.css" rel="stylesheet"/>
+  </head>
+  <body>
+
+    <div id="layout">
+      <div class="content">
+        <div v-if="error">
+        <span style="color:red;">Error: {{error}}</span>
+        <a class="button-action" href="#" @click.prevent="{error=null;}">Clear</a>
+        </div>
+
+        <form class="pure-from pure-form-stacked">
+          <input id="start-input" style="width:100%;" v-model="newStart"></input>
+          <button class="pure-button" @click.prevent="{ start(newStart); newStart='';}">Start</button>
+        </form>
+
+        <div v-if="ongoing.length > 0">
+          <h2>Ongoing:</h2>
+          <ul>
+            <li v-for="item in ongoing">
+              <span>{{item.title}} @ {{new Date(item.start).toLocaleString()}}</span>
+              <button class="button-small button-action pure-button" :data-title="item.title" @click="onFinish">Finish</button>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="recentTitles.length > 0">
+          <h2>Recent Titles: </h2>
+          <div style="margin-bottom: 0.2em;" v-for="title in recentTitles">
+            <span style="display:inline-block; width: 12em;">{{ title }}</span>
+            <button class="button-small button-action pure-button" :data-title="title" @click="onStart">Restart</button>
+            <button class="button-small button-action pure-button" :data-title="title">View</button>
+          </div>
+        </div>
+
+        <div v-if="detailObject != null">
+          <h2>Details: </h2>
+          <div class="pure-g detail-item">
+            <span class="pure-u-1-3">Title : </span>
+            <span class="pure-u-2-3"> {{detailObject.id.title}} </span>
+          </div>
+          <div class="pure-g detail-item">
+            <span class="pure-u-1-3">Start : </span>
+            <span class="pure-u-2-3"> {{detailObject.id.start}} </span>
+          </div>
+          <div class="pure-g detail-item">
+            <span class="pure-u-1-3">End : </span>
+            <span class="pure-u-2-3"> {{detailObject.end}} </span>
+          </div>
+          <div class="pure-g detail-item">
+            <span class="pure-u-1-3">Notes : </span>
+            <pre class="pure-u-2-3">{{detailObject.notes}}</pre>
+          </div>
+          <button class="button-small pure-button" @click.prevent="{detailObject = null;}">Close details</button>
+        </div>
+      </div>
+
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>

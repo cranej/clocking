@@ -19,6 +19,10 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Start clocking
+    ///
+    /// Unless '-n/--no-wait' is specified, waits for Ctrl-D to finish clocking.
+    ///
+    /// All input before Ctrl-D will be saved as notes.
     Start {
         /// If not specified, interactively choose from recent titles.
         title: Option<String>,
@@ -56,10 +60,13 @@ enum Commands {
         /// Title of the item to display.
         title: String,
     },
+    /// Server mode
+    Server { port: Option<u16> },
 }
 
 const STORE_FILE_VAR: &str = "CLOCKING_FILE";
-fn main() {
+#[rocket::main]
+async fn main() {
     let cli = Cli::parse();
 
     let store_file = cli
@@ -67,10 +74,10 @@ fn main() {
         .or_else(|| env::var(STORE_FILE_VAR).ok())
         .expect("Please specify storage file path either by environment or cli argument.");
 
-    let mut store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-
     match cli.command {
         Commands::Start { title, no_wait } => {
+            let mut store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
+
             let empty_title_err = "Empty title".to_string();
             let title = title
                 .ok_or(empty_title_err.clone())
@@ -93,7 +100,7 @@ fn main() {
                         .expect("Failed to start clocking");
                     println!("(Started)");
                     if !no_wait {
-                        println!("(Wait for notes, Ctrl-D to finish input)");
+                        println!("(Ctrl-D to finish clocking)");
                         let notes = read_to_end();
                         store.finish_clocking(&id, &notes);
                         println!("(Finished)");
@@ -105,6 +112,8 @@ fn main() {
             };
         }
         Commands::Finish { title, notes } => {
+            let mut store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
+
             let notes = if notes.len() == 1 && notes[0] == "-" {
                 read_to_end()
             } else {
@@ -124,6 +133,8 @@ fn main() {
             detail,
             ..
         } => {
+            let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
+
             let tail_offset = from.unwrap_or(0);
             let (start, end) = query_start_end(tail_offset, days);
 
@@ -139,10 +150,47 @@ fn main() {
                 println!("{}", &view.daily_summary_detail());
             }
         }
-        Commands::Latest { title } => match store.latest(&title) {
-            Some(item) => println!("{item}"),
-            None => println!("(Not found)"),
-        },
+        Commands::Latest { title } => {
+            let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
+
+            match store.latest(&title) {
+                Some(item) => println!("{item}"),
+                None => println!("(Not found)"),
+            }
+        }
+        Commands::Server { port } => {
+            let config = port
+                .map(|p| rocket::config::Config {
+                    port: p,
+                    ..rocket::config::Config::default()
+                })
+                .unwrap_or_else(|| rocket::config::Config::default());
+
+            let server_config = clocking::server::ServerConfig {
+                db_file: store_file.clone(),
+            };
+            let _rocket = rocket::custom(&config)
+                .manage(server_config)
+                .mount(
+                    "/api",
+                    rocket::routes![
+                        clocking::server::api_recent,
+                        clocking::server::api_latest,
+                        clocking::server::api_unfinished,
+                        clocking::server::api_start,
+                        clocking::server::api_finish,
+                    ],
+                )
+                .mount(
+                    "/",
+                    rocket::routes![clocking::server::index, clocking::server::anyfile,],
+                )
+                .ignite()
+                .await
+                .unwrap()
+                .launch()
+                .await;
+        }
     }
 }
 

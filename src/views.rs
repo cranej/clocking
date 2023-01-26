@@ -1,5 +1,6 @@
 use crate::ClockingItem;
 use chrono::prelude::*;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -23,7 +24,7 @@ fn strify_duration(d: &chrono::Duration) -> String {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Debug)]
 struct Effort {
     start: DateTime<Local>,
     end: DateTime<Local>,
@@ -49,7 +50,7 @@ impl Effort {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Debug)]
 pub struct ItemAgg {
     title: String,
     efforts: Vec<Effort>,
@@ -87,7 +88,7 @@ impl ItemAgg {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Debug)]
 pub struct ItemView {
     agg_list: Vec<ItemAgg>,
 }
