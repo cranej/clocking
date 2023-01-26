@@ -1,5 +1,3 @@
-//use chrono::prelude::*;
-use chrono::prelude::*;
 use clap::{Parser, Subcommand};
 use clocking::sqlite_store::SqliteStore;
 use clocking::ClockingStore;
@@ -134,12 +132,7 @@ async fn main() {
             ..
         } => {
             let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-
-            let tail_offset = from.unwrap_or(0);
-            let (start, end) = query_start_end(tail_offset, days);
-
-            // dbg!(start, end);
-            let items = store.query_clocking(&start, Some(end));
+            let items = store.query_clocking_offset(from.unwrap_or(0), days);
             let view = clocking::views::ItemView::new(&items);
 
             if daily_summary {
@@ -179,6 +172,7 @@ async fn main() {
                         clocking::server::api_unfinished,
                         clocking::server::api_start,
                         clocking::server::api_finish,
+                        clocking::server::api_report,
                     ],
                 )
                 .mount(
@@ -225,23 +219,6 @@ fn read_title(recent_titles: &[String]) -> Result<String, String> {
             }
         }
     }
-}
-
-fn query_start_end(days_offset: u64, days: Option<u64>) -> (DateTime<Utc>, DateTime<Utc>) {
-    let today_naive = Local::now().date_naive();
-    let local_fixed_offset = Local.offset_from_local_date(&today_naive).unwrap();
-    let today_naive = today_naive.and_hms_opt(0, 0, 0).unwrap();
-
-    let start_offset_days = chrono::naive::Days::new(days_offset);
-    let start_naive = today_naive.checked_sub_days(start_offset_days).unwrap();
-    let end_offset_days = chrono::naive::Days::new(days.unwrap_or(days_offset + 1));
-    let end_naive = start_naive.checked_add_days(end_offset_days).unwrap();
-    let start_in_utc =
-        DateTime::<FixedOffset>::from_local(start_naive, local_fixed_offset).with_timezone(&Utc);
-    let end_in_utc =
-        DateTime::<FixedOffset>::from_local(end_naive, local_fixed_offset).with_timezone(&Utc);
-
-    (start_in_utc, end_in_utc)
 }
 
 fn read_to_end() -> String {

@@ -1,5 +1,5 @@
 use crate::sqlite_store::SqliteStore;
-use crate::{ClockingItem, ClockingItemId, ClockingStore};
+use crate::{views, ClockingItem, ClockingItemId, ClockingStore};
 use rocket::{
     get,
     http::{ContentType, Status},
@@ -65,6 +65,12 @@ pub fn api_finish(title: &str, notes: String, config: &State<ServerConfig>) -> S
     }
 }
 
+#[get("/report/<offset>/<days>")]
+pub fn api_report(offset: u64, days: Option<u64>, config: &State<ServerConfig>) -> String {
+    let items = config.new_store().query_clocking_offset(offset, days);
+    let view = views::ItemView::new(&items);
+    view.daily_summary_detail()
+}
 /*
 #[get("/api/report")]
 #[get("/api/report/daily")]

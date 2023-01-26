@@ -92,7 +92,8 @@ impl ItemAgg {
 pub struct ItemView {
     agg_list: Vec<ItemAgg>,
 }
-
+type TitleDurationMap = HashMap<String, chrono::Duration>;
+type DateDurationMap = HashMap<NaiveDate, chrono::Duration>;
 impl fmt::Display for ItemView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r: fmt::Result = Ok(());
@@ -129,8 +130,8 @@ impl ItemView {
         }
     }
 
-    fn daily_view(&self) -> HashMap<NaiveDate, chrono::Duration> {
-        let mut daily_view: HashMap<NaiveDate, chrono::Duration> = HashMap::new();
+    fn daily_view(&self) -> DateDurationMap {
+        let mut daily_view: DateDurationMap = HashMap::new();
         for agg_summary in self.agg_list.iter().map(|agg| agg.daily_summary()) {
             for (date, duration) in agg_summary.iter() {
                 daily_view
@@ -143,8 +144,8 @@ impl ItemView {
         daily_view
     }
 
-    fn daily_view_detail(&self) -> HashMap<NaiveDate, HashMap<String, chrono::Duration>> {
-        let mut daily_view: HashMap<NaiveDate, HashMap<String, chrono::Duration>> = HashMap::new();
+    fn daily_view_detail(&self) -> HashMap<NaiveDate, TitleDurationMap> {
+        let mut daily_view: HashMap<NaiveDate, TitleDurationMap> = HashMap::new();
         for (title, agg_summary) in self
             .agg_list
             .iter()

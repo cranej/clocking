@@ -59,6 +59,18 @@
           </div>
           <button class="button-small pure-button" @click.prevent="{detailObject = null;}">Close details</button>
         </div>
+
+        <div>
+          <h2>Report</h2>
+          <div>
+            Offset: <input type="number" style="width: 5em;" id="report-offset" placeholder="Day offset" min="0" value="1" ref="reportOffset" />
+            Days: <input type="number" style="width: 5em;" id="report-days" placeholder="Days" min="0" ref="reportDays"/>
+            <button class="pure-button button-small button-action" @click.prevent="getReport">Go</button>
+          </div>
+          <div v-if="report">
+            <pre>{{report}}</pre>
+          </div>
+        </div>
       </div>
 
     </div>

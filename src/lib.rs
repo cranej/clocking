@@ -60,7 +60,41 @@ pub trait ClockingStore {
         start: &DateTime<Utc>,
         end: Option<DateTime<Utc>>,
     ) -> Vec<ClockingItem>;
+
+    /// Query finished clocking items from date range:
+    ///   start: (@today - `days_offset`) 0:00:00
+    ///   to: (@today - `days_offset` + days) 0:00:00 if days is not None, otherwise to now()
+    fn query_clocking_offset(&self, days_offset: u64, days: Option<u64>) -> Vec<ClockingItem> {
+        let (start, end) = store_helper::query_start_end(days_offset, days);
+        self.query_clocking(&start, end)
+    }
     fn latest(&self, title: &str) -> Option<ClockingItem>;
     fn recent_titles(&self, limit: usize) -> Vec<String>;
     fn unfinished(&self, limit: usize) -> Vec<ClockingItemId>;
+}
+
+pub(crate) mod store_helper {
+    use chrono::naive::Days as NaiveDays;
+    use chrono::prelude::*;
+
+    pub(crate) fn query_start_end(
+        days_offset: u64,
+        days: Option<u64>,
+    ) -> (DateTime<Utc>, Option<DateTime<Utc>>) {
+        let today_naive = Local::now().date_naive();
+        let local_fixed_offset = Local.offset_from_local_date(&today_naive).unwrap();
+        let today_naive = today_naive.and_hms_opt(0, 0, 0).unwrap();
+
+        let start_naive = today_naive
+            .checked_sub_days(NaiveDays::new(days_offset))
+            .unwrap();
+        let start_in_utc = DateTime::<FixedOffset>::from_local(start_naive, local_fixed_offset)
+            .with_timezone(&Utc);
+        let end_in_utc = days.map(|d| {
+            let end_naive = start_naive.checked_add_days(NaiveDays::new(d)).unwrap();
+            DateTime::<FixedOffset>::from_local(end_naive, local_fixed_offset).with_timezone(&Utc)
+        });
+
+        (start_in_utc, end_in_utc)
+    }
 }
