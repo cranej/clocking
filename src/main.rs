@@ -66,6 +66,8 @@ enum Commands {
         /// Default to 127.0.0.1
         #[arg(long, short)]
         addr: Option<std::net::IpAddr>,
+        #[arg(long, default_value_t = false)]
+        verbose: bool,
     },
 }
 
@@ -158,7 +160,11 @@ async fn main() {
                 None => println!("(Not found)"),
             }
         }
-        Commands::Server { port, addr } => {
+        Commands::Server {
+            port,
+            addr,
+            verbose,
+        } => {
             let config = rocket::config::Config {
                 port: port.unwrap_or(8080),
                 address: addr
@@ -169,7 +175,7 @@ async fn main() {
             let server_config = clocking::server::ServerConfig {
                 db_file: store_file.clone(),
             };
-            let _rocket = rocket::custom(&config)
+            let rocket = rocket::custom(&config)
                 .manage(server_config)
                 .mount(
                     "/api",
@@ -189,12 +195,16 @@ async fn main() {
                         clocking::server::favicon,
                         clocking::server::anyfile,
                     ],
-                )
-                .ignite()
-                .await
-                .unwrap()
-                .launch()
-                .await;
+                );
+
+            println!("Serve at: http://{}:{}", config.address, config.port);
+            if verbose {
+                println!("Registered routes:");
+                for r in rocket.routes() {
+                    println!("{r}");
+                }
+            }
+            let _ = rocket.ignite().await.unwrap().launch().await;
         }
     }
 }
