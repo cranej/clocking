@@ -59,7 +59,14 @@ enum Commands {
         title: String,
     },
     /// Server mode
-    Server { port: Option<u16> },
+    Server {
+        /// Defatut to 8080
+        #[arg(long, short)]
+        port: Option<u16>,
+        /// Default to 127.0.0.1
+        #[arg(long, short)]
+        addr: Option<std::net::IpAddr>,
+    },
 }
 
 const STORE_FILE_VAR: &str = "CLOCKING_FILE";
@@ -151,13 +158,13 @@ async fn main() {
                 None => println!("(Not found)"),
             }
         }
-        Commands::Server { port } => {
-            let config = port
-                .map(|p| rocket::config::Config {
-                    port: p,
-                    ..rocket::config::Config::default()
-                })
-                .unwrap_or_else(|| rocket::config::Config::default());
+        Commands::Server { port, addr } => {
+            let config = rocket::config::Config {
+                port: port.unwrap_or(8080),
+                address: addr
+                    .unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))),
+                ..rocket::config::Config::default()
+            };
 
             let server_config = clocking::server::ServerConfig {
                 db_file: store_file.clone(),

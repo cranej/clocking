@@ -34,8 +34,8 @@
           <h2>Recent Titles: </h2>
           <div style="margin-bottom: 0.2em;" v-for="title in recentTitles">
             <span style="display:inline-block; width: 12em;">{{ title }}</span>
-            <button class="button-small button-action pure-button" :data-title="title" @click="onStart">Restart</button>
-            <button class="button-small button-action pure-button" :data-title="title">View</button>
+            <button class="button-small button-action pure-button" :data-title="title" @click.prevent="onStart">Restart</button>
+            <button class="button-small button-action pure-button" :data-title="title" @click.prevent="onDetail">View</button>
           </div>
         </div>
 

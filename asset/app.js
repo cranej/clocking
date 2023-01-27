@@ -67,6 +67,18 @@ createApp({
             let url = `/api/report/${offsetParam}/${daysParam}`;
             this.report = await (await fetch(url)).text();
         },
+        async getItemDetail(title) {
+            let url = `/api/latest/${encodeURI(title)}`;
+            let obj = await (await fetch(url)).json();
+            if (obj != null) {
+                obj.id.start = new Date(obj.id.start).toLocaleString();
+                if (obj.end != null) {
+                    obj.end = new Date(obj.end).toLocaleString();
+                }
+            }
+            this.detailObject = obj;
+
+        },
         onStart(event) {
             let title = event.target.getAttribute("data-title");
             this.start(title);
@@ -75,5 +87,9 @@ createApp({
             let title = event.target.getAttribute("data-title");
             this.finish(title);
         },
+        onDetail(event) {
+            let title = event.target.getAttribute("data-title");
+            this.getItemDetail(title);
+        }
     }
 }).mount("#layout");
