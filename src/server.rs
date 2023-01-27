@@ -86,6 +86,12 @@ pub fn index() -> (ContentType, String) {
     )
 }
 
+#[get("/favicon.png")]
+pub fn favicon() -> (ContentType, Vec<u8>) {
+    let page = Asset::get("favicon.png").unwrap();
+    (ContentType::PNG, page.data.into_owned())
+}
+
 #[get("/<file..>")]
 pub fn anyfile(file: PathBuf) -> (ContentType, String) {
     let content_type = match file.as_path().extension() {

@@ -184,7 +184,11 @@ async fn main() {
                 )
                 .mount(
                     "/",
-                    rocket::routes![clocking::server::index, clocking::server::anyfile,],
+                    rocket::routes![
+                        clocking::server::index,
+                        clocking::server::favicon,
+                        clocking::server::anyfile,
+                    ],
                 )
                 .ignite()
                 .await
