@@ -8,8 +8,8 @@
   </head>
   <body>
 
-    <div id="layout">
-      <div class="content">
+    <div id="layout" class="pure-g">
+      <div class="content pure-u-1-1 l-box">
         <div v-if="error">
         <span style="color:red;">Error: {{error}}</span>
         <a class="button-action" href="#" @click.prevent="{error=null;}">Clear</a>
