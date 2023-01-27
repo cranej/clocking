@@ -4,7 +4,7 @@
 - [x] basic report
 - [x] support daily view
 - [x] finish latest unfinished work
-- [ ] web server mode
+- [x] web server mode
 - [x] list recent work names when starting clocking
 - [ ] report weekly view
 - [ ] support filtering item name when reporting

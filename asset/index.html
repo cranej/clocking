@@ -18,7 +18,7 @@
 
         <form class="pure-from pure-form-stacked">
           <input id="start-input" style="width:20em%;" v-model="newStart"></input>
-          <button class="pure-button" @click.prevent="{ start(newStart); newStart='';}">Start</button>
+          <button class="pure-button"  :disabled="ongoing.length > 0" @click.prevent="{ start(newStart); newStart='';}">Start</button>
         </form>
 
         <div v-if="ongoing.length > 0">
@@ -35,7 +35,7 @@
           <h2>Recent Titles: </h2>
           <div style="margin-bottom: 0.2em;" v-for="title in recentTitles">
             <span style="display:inline-block; width: 12em;">{{ title }}</span>
-            <button class="button-small button-action pure-button" :data-title="title" @click.prevent="onStart">Restart</button>
+            <button class="button-small button-action pure-button" :disabled="ongoing.length > 0" :data-title="title" @click.prevent="onStart">Restart</button>
             <button class="button-small button-action pure-button" :data-title="title" @click.prevent="onDetail">View</button>
           </div>
         </div>
@@ -64,7 +64,7 @@
         <div>
           <h2>Report</h2>
           <div>
-            Offset: <input type="number" style="width: 5em;" id="report-offset" placeholder="Day offset" min="0" value="1" ref="reportOffset" />
+            Offset: <input type="number" style="width: 5em;" id="report-offset" placeholder="Day offset" min="0" value="0" ref="reportOffset" />
             Days: <input type="number" style="width: 5em;" id="report-days" placeholder="Days" min="0" ref="reportDays"/>
             <button class="pure-button button-small button-action" @click.prevent="getReport">Go</button>
           </div>
