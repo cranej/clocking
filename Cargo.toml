@@ -1,6 +1,6 @@
 [package]
 name = "clocking"
-version = "0.7.0"
+version = "0.10.0"
 description = "A time hacking tool."
 edition = "2021"
 authors = ["Crane Jin <crane@cranejin.com>"]

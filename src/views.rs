@@ -1,8 +1,11 @@
 use crate::ClockingItem;
 use chrono::prelude::*;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap as Map, HashMap};
 use std::fmt;
+
+type TitleDurationMap = Map<String, chrono::Duration>;
+type DateDurationMap = Map<NaiveDate, chrono::Duration>;
 
 const HOUR_MINUTES: i64 = 60;
 const DAY_MINUTES: i64 = HOUR_MINUTES * 24;
@@ -75,8 +78,8 @@ impl ItemAgg {
             .unwrap()
     }
 
-    fn daily_summary(&self) -> HashMap<NaiveDate, chrono::Duration> {
-        let mut map: HashMap<NaiveDate, chrono::Duration> = HashMap::new();
+    fn daily_summary(&self) -> DateDurationMap {
+        let mut map: DateDurationMap = DateDurationMap::new();
         for eff in self.efforts.iter() {
             let start_date = eff.start.date_naive();
             map.entry(start_date)
@@ -92,8 +95,6 @@ impl ItemAgg {
 pub struct ItemView {
     agg_list: Vec<ItemAgg>,
 }
-type TitleDurationMap = HashMap<String, chrono::Duration>;
-type DateDurationMap = HashMap<NaiveDate, chrono::Duration>;
 impl fmt::Display for ItemView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r: fmt::Result = Ok(());
@@ -131,7 +132,7 @@ impl ItemView {
     }
 
     fn daily_view(&self) -> DateDurationMap {
-        let mut daily_view: DateDurationMap = HashMap::new();
+        let mut daily_view: DateDurationMap = Map::new();
         for agg_summary in self.agg_list.iter().map(|agg| agg.daily_summary()) {
             for (date, duration) in agg_summary.iter() {
                 daily_view
@@ -144,8 +145,8 @@ impl ItemView {
         daily_view
     }
 
-    fn daily_view_detail(&self) -> HashMap<NaiveDate, TitleDurationMap> {
-        let mut daily_view: HashMap<NaiveDate, TitleDurationMap> = HashMap::new();
+    fn daily_view_detail(&self) -> Map<NaiveDate, TitleDurationMap> {
+        let mut daily_view: Map<NaiveDate, TitleDurationMap> = Map::new();
         for (title, agg_summary) in self
             .agg_list
             .iter()
@@ -161,7 +162,7 @@ impl ItemView {
                             .or_insert(*duration);
                     })
                     .or_insert_with(|| {
-                        let mut map: HashMap<String, chrono::Duration> = HashMap::new();
+                        let mut map: TitleDurationMap = TitleDurationMap::new();
                         map.insert(title.to_string(), *duration);
                         map
                     });

@@ -8,22 +8,21 @@
     <link href="./style.css" rel="stylesheet"/>
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon.png">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Observe the time</title>
   </head>
   <body>
-
     <div id="layout" class="pure-g">
       <div class="pure-u-1 pure-u-md-1-6 pure-u-lg-1-4"></div>
       <div class="pure-u-1 pure-u-md-2-3 pure-u-lg-1-2 l-box">
-          <div v-if="error">
-            <span style="color:red;">Error: {{error}}</span>
-            <a class="button-action" href="#" @click.prevent="{error=null;}">Clear</a>
-          </div>
-
+        <h1>Observe the <span style="font-style: italic; text-underline-offset: 8px; text-decoration: underline #fa582f 5px;">time<span></h1>
           <form class="pure-from pure-form-stacked">
             <input id="start-input" style="width:100%;" v-model="newStart"></input>
             <button class="pure-button pure-button-primary"  :disabled="ongoing.length > 0" @click.prevent="{ start(newStart); newStart='';}">Start</button>
           </form>
-
+          <div v-if="error">
+            <span style="color:red;">Error: {{error}}</span>
+            <a class="button-action" href="#" @click.prevent="{error=null;}">Clear</a>
+          </div>
           <div v-if="ongoing.length > 0">
             <h2>Ongoing:</h2>
             <div v-for="item in ongoing" class="pure-g">
