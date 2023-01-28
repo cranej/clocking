@@ -4,76 +4,94 @@
     <meta charset="UTF-8"/>
     <script src="./vue.js"></script>
     <link href="./pure-min.css" rel="stylesheet"/>
+    <link href="./pure-grid-min.css" rel="stylesheet"/>
     <link href="./style.css" rel="stylesheet"/>
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
   <body>
 
     <div id="layout" class="pure-g">
-      <div class="content pure-u-1-1 l-box">
-        <div v-if="error">
-        <span style="color:red;">Error: {{error}}</span>
-        <a class="button-action" href="#" @click.prevent="{error=null;}">Clear</a>
-        </div>
-
-        <form class="pure-from pure-form-stacked">
-          <input id="start-input" style="width:20em%;" v-model="newStart"></input>
-          <button class="pure-button"  :disabled="ongoing.length > 0" @click.prevent="{ start(newStart); newStart='';}">Start</button>
-        </form>
-
-        <div v-if="ongoing.length > 0">
-          <h2>Ongoing:</h2>
-          <ul>
-            <li v-for="item in ongoing">
-              <span>{{item.title}} @ {{new Date(item.start).toLocaleString()}}</span>
-              <button class="button-small button-action pure-button" :data-title="item.title" @click="onFinish">Finish</button>
-            </li>
-          </ul>
-        </div>
-
-        <div v-if="recentTitles.length > 0">
-          <h2>Recent Titles: </h2>
-          <div style="margin-bottom: 0.2em;" v-for="title in recentTitles">
-            <span style="display:inline-block; width: 12em;">{{ title }}</span>
-            <button class="button-small button-action pure-button" :disabled="ongoing.length > 0" :data-title="title" @click.prevent="onStart">Restart</button>
-            <button class="button-small button-action pure-button" :data-title="title" @click.prevent="onDetail">View</button>
+      <div class="pure-u-1 pure-u-md-1-6 pure-u-lg-1-4"></div>
+      <div class="pure-u-1 pure-u-md-2-3 pure-u-lg-1-2 l-box">
+          <div v-if="error">
+            <span style="color:red;">Error: {{error}}</span>
+            <a class="button-action" href="#" @click.prevent="{error=null;}">Clear</a>
           </div>
-        </div>
 
-        <div v-if="detailObject != null">
-          <h2>Details: </h2>
-          <div class="pure-g detail-item">
-            <span class="pure-u-1-3">Title : </span>
-            <span class="pure-u-2-3"> {{detailObject.id.title}} </span>
-          </div>
-          <div class="pure-g detail-item">
-            <span class="pure-u-1-3">Start : </span>
-            <span class="pure-u-2-3"> {{detailObject.id.start}} </span>
-          </div>
-          <div class="pure-g detail-item">
-            <span class="pure-u-1-3">End : </span>
-            <span class="pure-u-2-3"> {{detailObject.end}} </span>
-          </div>
-          <div class="pure-g detail-item">
-            <span class="pure-u-1-3">Notes : </span>
-            <pre class="pure-u-2-3">{{detailObject.notes}}</pre>
-          </div>
-          <button class="button-small pure-button" @click.prevent="{detailObject = null;}">Close details</button>
-        </div>
+          <form class="pure-from pure-form-stacked">
+            <input id="start-input" style="width:100%;" v-model="newStart"></input>
+            <button class="pure-button pure-button-primary"  :disabled="ongoing.length > 0" @click.prevent="{ start(newStart); newStart='';}">Start</button>
+          </form>
 
-        <div>
-          <h2>Report</h2>
+          <div v-if="ongoing.length > 0">
+            <h2>Ongoing:</h2>
+            <div v-for="item in ongoing" class="pure-g">
+              <p class="pure-u-4-5" style="margin-top: 0;">
+                {{item.title}} @ {{new Date(item.start).toLocaleString()}}
+              </p>
+              <div class="pure-u-1-5" style="text-align: right">
+                <button class="button-small button-action pure-button" :data-title="item.title" @click="onFinish">Finish</button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="recentTitles.length > 0">
+            <h2>Recent Titles: </h2>
+            <div style="margin-bottom: 0.2em;" class="pure-g" v-for="title in recentTitles">
+              <p class="pure-u-3-5" style="margin-top: 0;">
+                {{ title }}
+              </p>
+              <div class="pure-u-2-5" style="text-align: right">
+                <button class="button-small button-action pure-button" :disabled="ongoing.length > 0" :data-title="title" @click.prevent="onStart">Restart</button>
+                <button class="button-small button-action pure-button" :data-title="title" @click.prevent="onDetail">View</button>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="detailObject != null">
+            <h2>Details: </h2>
+            <div class="pure-g detail-item">
+              <span class="pure-u-1-3">Title : </span>
+              <span class="pure-u-2-3"> {{detailObject.id.title}} </span>
+            </div>
+            <div class="pure-g detail-item">
+              <span class="pure-u-1-3">Start : </span>
+              <span class="pure-u-2-3"> {{detailObject.id.start}} </span>
+            </div>
+            <div class="pure-g detail-item">
+              <span class="pure-u-1-3">End : </span>
+              <span class="pure-u-2-3"> {{detailObject.end}} </span>
+            </div>
+            <div class="pure-g detail-item">
+              <span class="pure-u-1-3">Notes : </span>
+              <pre class="pure-u-2-3">{{detailObject.notes}}</pre>
+            </div>
+            <button class="button-small pure-button" @click.prevent="{detailObject = null;}">Close details</button>
+          </div>
+
           <div>
-            Offset: <input type="number" style="width: 5em;" id="report-offset" placeholder="Day offset" min="0" value="0" ref="reportOffset" />
-            Days: <input type="number" style="width: 5em;" id="report-days" placeholder="Days" min="0" ref="reportDays"/>
-            <button class="pure-button button-small button-action" @click.prevent="getReport">Go</button>
+            <h2>Report</h2>
+            <form class="pure-form pure-form-stacked">
+              <fieldset>
+                <label for="report-offset">Start Offset</label>
+                <input type="number" id="report-offset" placeholder="Day offset" min="0" value="0" ref="reportOffset" />
+                <label for="report-days">Days</label>
+                <input type="number" id="report-days" placeholder="Days" min="1" ref="reportDays"/>
+                <button class="pure-button pure-button-primary" @click.prevent="onGetReport">Go</button>
+              </fieldset>
+            </form>
+            <div class="pure-g">
+              <div class="pure-u-1-3"><a href="#" @click.prevent="getReport(0,'null')">Today</a></div>
+              <div class="pure-u-1-3"><a href="#" @click.prevent="getReport(1, 'null')">Last 2 days</a></div>
+              <div class="pure-u-1-3"><a href="#" @click.prevent="getReport(6, 'null')">Last 7 days</a></div>
+            </div>
+            <div v-if="report">
+              <pre>{{report}}</pre>
+            </div>
           </div>
-          <div v-if="report">
-            <pre>{{report}}</pre>
-          </div>
-        </div>
       </div>
-
+      <div class="pure-u-1 pure-u-md-1-6 pure-u-lg-1-4"></div>
     </div>
 
     <script src="./app.js"></script>

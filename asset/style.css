@@ -11,24 +11,10 @@
     border-top: solid 1px lightgray;
 }
 
-.content {
-    font-size: 32px;
-    /*
-    width: 90%;
-    margin-left: auto;
-    margin-right: auto;
-    margin-top: 2em;
-   */
-}
-
-.pure-g > div {
+.pure-g > div, #start-input {
     box-sizing: border-box;
 }
 
 .l-box {
     padding: 1em;
-}
-
-li {
-    padding-top: 0.5em;
 }

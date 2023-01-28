@@ -57,15 +57,18 @@ createApp({
                        }
                    }).catch((err) => this.error = err))
         },
-        async getReport() {
+        async getReport(offset, days) {
+            let url = `/api/report/${offset}/${days}`;
+            this.report = await (await fetch(url)).text();
+        },
+        onGetReport() {
             let offset = this.$refs.reportOffset.value;
             let days = this.$refs.reportDays.value;
             console.log(offset);
             console.log(days);
             let offsetParam = isNaN(parseInt(offset, 10)) ? "0" : offset;
             let daysParam = isNaN(parseInt(days, 10)) ? "null" : days;
-            let url = `/api/report/${offsetParam}/${daysParam}`;
-            this.report = await (await fetch(url)).text();
+            this.getReport(offsetParam, daysParam);
         },
         async getItemDetail(title) {
             let url = `/api/latest/${encodeURI(title)}`;
