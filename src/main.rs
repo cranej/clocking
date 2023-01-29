@@ -6,10 +6,11 @@ use std::io::{self, Write};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about, propagate_version = true)]
+/// Observe the time
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    /// File to store the data, take priority of environment variable 'CLOCKING_FILE'.
+    /// File path to store the data, required if no environment variable 'CLOCKING_FILE' detected.  Take priority of environment variable 'CLOCKING_FILE'.
     #[arg(long)]
     file: Option<String>,
 }
@@ -18,8 +19,7 @@ struct Cli {
 enum Commands {
     /// Start clocking
     ///
-    /// Unless '-n/--no-wait' is specified, waits for Ctrl-D to finish clocking.
-    ///
+    /// Unless '-n/--no-wait' is specified, waits for Ctrl-D to finish clocking. \
     /// All input before Ctrl-D will be saved as notes.
     Start {
         /// If not specified, interactively choose from recent titles.
@@ -28,20 +28,21 @@ enum Commands {
         #[arg(short, long)]
         no_wait: bool,
     },
-    /// Finish latest unfinished clocking of title
+    /// Finish latest unfinished clocking of title.
     Finish {
-        title: String,
-        /// Can be specified multiple times, each as a separate line. Sinel value '-' means read from stdin
+        /// Title to finish. Choose interactively if not specified
+        title: Option<String>,
+        /// Can be specified multiple times, each as a separate line. Sinel value '-' means read from stdin.
         #[arg(short, long)]
         notes: Vec<String>,
     },
-    /// Report clocking data
+    /// Report clocking data.
     Report {
         ///Tail offset. Default to 0 - today
         #[arg(short, long)]
         from: Option<u64>,
         ///Limit days from tail offset. Default to until now
-        #[arg(short, long)]
+        #[arg(short, long, value_parser = clap::value_parser!(u64).range(1..))]
         days: Option<u64>,
         ///Show daily summary
         #[arg(long = "daily")]
@@ -53,14 +54,14 @@ enum Commands {
         #[arg(long)]
         filter: Option<String>,
     },
-    /// Details of latest record of item 'title'.
+    /// Show details of latest record of item 'title'.
     Latest {
-        /// Title of the item to display.
-        title: String,
+        /// Title of the item to display. Choose interactively if not specified.
+        title: Option<String>,
     },
     /// Server mode
     Server {
-        /// Defatut to 8080
+        /// Default to 8080
         #[arg(long, short)]
         port: Option<u16>,
         /// Default to 127.0.0.1
@@ -72,6 +73,7 @@ enum Commands {
 }
 
 const STORE_FILE_VAR: &str = "CLOCKING_FILE";
+const RECENT_TITLE_LIMIT: usize = 5;
 #[rocket::main]
 async fn main() {
     let cli = Cli::parse();
@@ -79,27 +81,12 @@ async fn main() {
     let store_file = cli
         .file
         .or_else(|| env::var(STORE_FILE_VAR).ok())
-        .expect("Please specify storage file path either by environment or cli argument.");
+        .expect("Please specify storage file path either by environment or cli argument --file before any command.");
 
     match cli.command {
         Commands::Start { title, no_wait } => {
             let mut store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-
-            let empty_title_err = "Empty title".to_string();
-            let title = title
-                .ok_or(empty_title_err.clone())
-                .and_then(|x| {
-                    if x.is_empty() {
-                        Err(empty_title_err.clone())
-                    } else {
-                        Ok(x)
-                    }
-                })
-                .or_else(|_| {
-                    let recent_titles = store.recent_titles(5);
-                    read_title(&recent_titles)
-                });
-
+            let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
             match title {
                 Ok(title) => {
                     let id = store
@@ -127,10 +114,14 @@ async fn main() {
                 notes.join("\n")
             };
 
-            match store.finish_latest_unfinished_by_title(&title, &notes) {
-                Ok(true) => println!("(Updated)"),
-                Ok(false) => println!("(No unfinished item found by {title})"),
-                Err(e) => eprintln!("Unexpected error: {e}"),
+            let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
+            match title {
+                Ok(title) => match store.finish_latest_unfinished_by_title(&title, &notes) {
+                    Ok(true) => println!("(Updated)"),
+                    Ok(false) => println!("(No unfinished item found by {title})"),
+                    Err(e) => eprintln!("Unexpected error: {e}"),
+                },
+                Err(err) => eprintln!("Error reading or choosing title: {err}."),
             }
         }
         Commands::Report {
@@ -155,9 +146,13 @@ async fn main() {
         Commands::Latest { title } => {
             let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
 
-            match store.latest(&title) {
-                Some(item) => println!("{item}"),
-                None => println!("(Not found)"),
+            let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
+            match title {
+                Ok(title) => match store.latest(&title) {
+                    Some(item) => println!("{item}"),
+                    None => println!("(Not found)"),
+                },
+                Err(err) => eprintln!("Error reading or choosing title: {err}."),
             }
         }
         Commands::Server {
@@ -207,6 +202,20 @@ async fn main() {
             let _ = rocket.ignite().await.unwrap().launch().await;
         }
     }
+}
+
+fn handle_title(title: Option<String>, recent_titles: &[String]) -> Result<String, String> {
+    let empty_title_err = "Empty title".to_string();
+    title
+        .ok_or(empty_title_err.clone())
+        .and_then(|x| {
+            if x.is_empty() {
+                Err(empty_title_err.clone())
+            } else {
+                Ok(x)
+            }
+        })
+        .or_else(|_| read_title(&recent_titles))
 }
 
 fn read_title(recent_titles: &[String]) -> Result<String, String> {

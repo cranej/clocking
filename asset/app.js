@@ -7,7 +7,7 @@ createApp({
             ongoing: [],
             error: null,
             newStart: '',
-            report: null,
+            report: null
         }
     },
 

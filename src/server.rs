@@ -42,7 +42,6 @@ pub fn api_unfinished(config: &State<ServerConfig>) -> Json<Vec<ClockingItemId>>
 
 #[post("/start/<title>")]
 pub fn api_start(title: &str, config: &State<ServerConfig>) -> Status {
-    dbg!(title);
     if title.is_empty() {
         Status::BadRequest
     } else {
