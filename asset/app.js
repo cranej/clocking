@@ -4,10 +4,11 @@ createApp({
         return {
             recentTitles: [],
             detailObject: null ,
-            ongoing: [],
+            ongoing: new Map(),
             error: null,
             newStart: '',
-            report: null
+            report: null,
+            queryParam: {'startOffset': "0", "days": ""},
         }
     },
 
@@ -22,7 +23,12 @@ createApp({
         },
         async getUnfinished() {
             const url = '/api/unfinished/';
-            this.ongoing = await (await fetch(url)).json()
+            let unfinished = await (await fetch(url)).json();
+            let m = new Map();
+            for (const element of unfinished) {
+                m.set(element.title, {'item': element, 'notes': ''});
+            };
+            this.ongoing = m;
         },
 
         getData() {
@@ -48,7 +54,7 @@ createApp({
         },
         async finish(title) {
             let url = `/api/finish/${encodeURI(title)}`;
-            await (fetch(url, {method: 'POST', body: ""})
+            await (fetch(url, {method: 'POST', body: this.ongoing.get(title).notes})
                    .then((rep) => {
                        if (rep.ok) {
                            this.getData();
@@ -58,17 +64,10 @@ createApp({
                    }).catch((err) => this.error = err))
         },
         async getReport(offset, days) {
-            let url = `/api/report/${offset}/${days}`;
-            this.report = await (await fetch(url)).text();
-        },
-        onGetReport() {
-            let offset = this.$refs.reportOffset.value;
-            let days = this.$refs.reportDays.value;
-            console.log(offset);
-            console.log(days);
             let offsetParam = isNaN(parseInt(offset, 10)) ? "0" : offset;
             let daysParam = isNaN(parseInt(days, 10)) ? "null" : days;
-            this.getReport(offsetParam, daysParam);
+            let url = `/api/report/${offsetParam}/${daysParam}`;
+            this.report = await (await fetch(url)).text();
         },
         async getItemDetail(title) {
             let url = `/api/latest/${encodeURI(title)}`;
@@ -80,19 +79,6 @@ createApp({
                 }
             }
             this.detailObject = obj;
-
-        },
-        onStart(event) {
-            let title = event.target.getAttribute("data-title");
-            this.start(title);
-        },
-        onFinish(event) {
-            let title = event.target.getAttribute("data-title");
-            this.finish(title);
-        },
-        onDetail(event) {
-            let title = event.target.getAttribute("data-title");
-            this.getItemDetail(title);
         }
     }
 }).mount("#layout");

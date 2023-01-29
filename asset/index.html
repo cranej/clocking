@@ -23,14 +23,16 @@
             <span style="color:red;">Error: {{error}}</span>
             <a class="button-action" href="#" @click.prevent="{error=null;}">Clear</a>
           </div>
-          <div v-if="ongoing.length > 0">
+          <div v-if="ongoing.size > 0">
             <h2>Ongoing:</h2>
-            <div v-for="item in ongoing" class="pure-g">
-              <p class="pure-u-4-5" style="margin-top: 0;">
-                {{item.title}} @ {{new Date(item.start).toLocaleString()}}
+            <div v-for="[title, obj] in ongoing" class="pure-g">
+              <p class="pure-u-1" style="margin-top: 0;">
+                {{title}} @ {{new Date(obj.item.start).toLocaleString()}}
               </p>
-              <div class="pure-u-1-5" style="text-align: right">
-                <button class="button-small button-action pure-button" :data-title="item.title" @click="onFinish">Finish</button>
+              <div class="pure-u-1" style="margin-bottom: o.2em">
+                <p style="margin: 0 auto">Notes:</p>
+                <textarea type="textarea" v-model="obj.notes"></textarea>
+                <button class="button-small button-action pure-button" style="vertical-align: bottom;" @click="finish(title)">Finish</button>
               </div>
             </div>
           </div>
@@ -42,8 +44,8 @@
                 {{ title }}
               </p>
               <div class="pure-u-2-5" style="text-align: right">
-                <button class="button-small button-action pure-button" :disabled="ongoing.length > 0" :data-title="title" @click.prevent="onStart">Restart</button>
-                <button class="button-small button-action pure-button" :data-title="title" @click.prevent="onDetail">View</button>
+                <button class="button-small button-action pure-button" :disabled="ongoing.length > 0" @click.prevent="start(title)">Restart</button>
+                <button class="button-small button-action pure-button" @click.prevent="getItemDetail(title)">View</button>
               </div>
             </div>
           </div>
@@ -64,7 +66,7 @@
             </div>
             <div class="pure-g detail-item">
               <span class="pure-u-1-3">Notes : </span>
-              <pre class="pure-u-2-3">{{detailObject.notes}}</pre>
+              <pre class="pure-u-2-3" style="overflow: scroll; white-space: pre-wrap;">{{detailObject.notes}}</pre>
             </div>
             <button class="button-small pure-button" @click.prevent="{detailObject = null;}">Close details</button>
           </div>
@@ -74,10 +76,10 @@
             <form class="pure-form pure-form-stacked">
               <fieldset>
                 <label for="report-offset">Start Offset</label>
-                <input type="number" id="report-offset" placeholder="Day offset" min="0" value="0" ref="reportOffset" />
+                <input type="number" id="report-offset" placeholder="Day offset" min="0" v-model="queryParam.startOffset"/>
                 <label for="report-days">Days</label>
-                <input type="number" id="report-days" placeholder="Days" min="1" ref="reportDays"/>
-                <button class="pure-button pure-button-primary" @click.prevent="onGetReport">Go</button>
+                <input type="number" id="report-days" placeholder="Days" min="1" v-model="queryParam.days"/>
+                <button class="pure-button pure-button-primary" @click.prevent="getReport(queryParam.startOffset, queryParam.days)">Go</button>
               </fieldset>
             </form>
             <div class="pure-g">
