@@ -89,14 +89,12 @@ async fn main() {
             let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
             match title {
                 Ok(title) => {
-                    let id = store
-                        .start_clocking(&title)
-                        .expect("Failed to start clocking");
+                    let id = store.start(&title).expect("Failed to start clocking");
                     println!("(Started)");
                     if !no_wait {
                         println!("(Ctrl-D to finish clocking)");
                         let notes = read_to_end();
-                        store.finish_clocking(&id, &notes);
+                        store.finish(&id, &notes);
                         println!("(Finished)");
                     };
                 }
@@ -132,15 +130,17 @@ async fn main() {
             ..
         } => {
             let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-            let items = store.query_clocking_offset(from.unwrap_or(0), days);
-            let view = clocking::views::ItemView::new(&items);
+            let items = store.query_offset(from.unwrap_or(0), days);
 
             if daily_summary {
-                println!("{}", &view.daily_summary());
+                let view = clocking::views::DailySummaryView::new(&items);
+                println!("{view}");
             } else if detail {
+                let view = clocking::views::DetailView::new(&items);
                 println!("{view}");
             } else {
-                println!("{}", &view.daily_summary_detail());
+                let view = clocking::views::DailyDetailView::new(&items);
+                println!("{view}");
             }
         }
         Commands::Latest { title } => {

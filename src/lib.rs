@@ -45,28 +45,19 @@ impl fmt::Display for ClockingItem {
 type Result<T> = std::result::Result<T, String>;
 
 pub trait ClockingStore {
-    fn start_clocking(&mut self, title: &str) -> Result<ClockingItemId>;
-    fn start_clocking_item(&mut self, item: &ClockingItem) -> bool;
-    fn finish_clocking(&mut self, id: &ClockingItemId, notes: &str) -> bool;
+    fn start(&mut self, title: &str) -> Result<ClockingItemId>;
+    fn start_item(&mut self, item: &ClockingItem) -> bool;
+    fn finish(&mut self, id: &ClockingItemId, notes: &str) -> bool;
     fn finish_latest_unfinished_by_title(&mut self, title: &str, notes: &str) -> Result<bool>;
-    fn finish_clocking_item(
-        &mut self,
-        id: &ClockingItemId,
-        end: &DateTime<Utc>,
-        notes: &str,
-    ) -> bool;
-    fn query_clocking(
-        &self,
-        start: &DateTime<Utc>,
-        end: Option<DateTime<Utc>>,
-    ) -> Vec<ClockingItem>;
+    fn finish_item(&mut self, id: &ClockingItemId, end: &DateTime<Utc>, notes: &str) -> bool;
+    fn query(&self, start: &DateTime<Utc>, end: Option<DateTime<Utc>>) -> Vec<ClockingItem>;
 
     /// Query finished clocking items from date range:
     ///   start: (@today - `days_offset`) 0:00:00
     ///   to: (@today - `days_offset` + days) 0:00:00 if days is not None, otherwise to now()
-    fn query_clocking_offset(&self, days_offset: u64, days: Option<u64>) -> Vec<ClockingItem> {
+    fn query_offset(&self, days_offset: u64, days: Option<u64>) -> Vec<ClockingItem> {
         let (start, end) = store_helper::query_start_end(days_offset, days);
-        self.query_clocking(&start, end)
+        self.query(&start, end)
     }
     fn latest(&self, title: &str) -> Option<ClockingItem>;
     fn recent_titles(&self, limit: usize) -> Vec<String>;

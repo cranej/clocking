@@ -45,7 +45,7 @@ pub fn api_start(title: &str, config: &State<ServerConfig>) -> Status {
     if title.is_empty() {
         Status::BadRequest
     } else {
-        match config.new_store().start_clocking(title) {
+        match config.new_store().start(title) {
             Ok(_) => Status::Ok,
             Err(_) => Status::InternalServerError,
         }
@@ -66,9 +66,9 @@ pub fn api_finish(title: &str, notes: String, config: &State<ServerConfig>) -> S
 
 #[get("/report/<offset>/<days>")]
 pub fn api_report(offset: u64, days: Option<u64>, config: &State<ServerConfig>) -> String {
-    let items = config.new_store().query_clocking_offset(offset, days);
-    let view = views::ItemView::new(&items);
-    view.daily_summary_detail()
+    let items = config.new_store().query_offset(offset, days);
+    let view = views::DailyDetailView::new(&items);
+    view.to_string()
 }
 /*
 #[get("/api/report")]

@@ -51,7 +51,7 @@ impl SqliteStore {
 }
 
 impl ClockingStore for SqliteStore {
-    fn start_clocking(&mut self, title: &str) -> Result<ClockingItemId> {
+    fn start(&mut self, title: &str) -> Result<ClockingItemId> {
         let item = ClockingItem {
             id: ClockingItemId {
                 title: title.to_string(),
@@ -61,14 +61,14 @@ impl ClockingStore for SqliteStore {
             notes: String::new(),
         };
 
-        if self.start_clocking_item(&item) {
+        if self.start_item(&item) {
             Ok(item.id.clone())
         } else {
             Err("Falied to start clocking.".to_string())
         }
     }
 
-    fn start_clocking_item(&mut self, item: &ClockingItem) -> bool {
+    fn start_item(&mut self, item: &ClockingItem) -> bool {
         let start_time_string = item.id.start.to_rfc3339();
         match self.conn.query_row(
             "SELECT id FROM clocking WHERE title = ? and start = ?",
@@ -101,9 +101,9 @@ impl ClockingStore for SqliteStore {
             }
         }
     }
-    fn finish_clocking(&mut self, id: &ClockingItemId, notes: &str) -> bool {
+    fn finish(&mut self, id: &ClockingItemId, notes: &str) -> bool {
         let end = Utc::now();
-        self.finish_clocking_item(id, &end, notes)
+        self.finish_item(id, &end, notes)
     }
 
     fn finish_latest_unfinished_by_title(&mut self, title: &str, notes: &str) -> Result<bool> {
@@ -123,12 +123,7 @@ impl ClockingStore for SqliteStore {
             })
     }
 
-    fn finish_clocking_item(
-        &mut self,
-        id: &ClockingItemId,
-        end: &DateTime<Utc>,
-        notes: &str,
-    ) -> bool {
+    fn finish_item(&mut self, id: &ClockingItemId, end: &DateTime<Utc>, notes: &str) -> bool {
         let start_string = id.start.to_rfc3339();
         let end_string = end.to_rfc3339();
         match self.conn.execute("UPDATE clocking SET end = ?, notes = IFNULL(notes, '')||?  WHERE title = ? and start = ? and end IS NULL",
@@ -139,11 +134,7 @@ impl ClockingStore for SqliteStore {
         }
     }
 
-    fn query_clocking(
-        &self,
-        start: &DateTime<Utc>,
-        end: Option<DateTime<Utc>>,
-    ) -> Vec<ClockingItem> {
+    fn query(&self, start: &DateTime<Utc>, end: Option<DateTime<Utc>>) -> Vec<ClockingItem> {
         let start_string = start.to_rfc3339();
         let end_string = end.map_or_else(|| Utc::now().to_rfc3339(), |x| x.to_rfc3339());
         let mut stmt = self.conn.prepare(
@@ -214,15 +205,15 @@ mod tests {
             notes: String::new(),
         };
 
-        assert_eq!(mem_store.start_clocking_item(&item), true);
+        assert_eq!(mem_store.start_item(&item), true);
         // add again
         assert_eq!(
-            mem_store.start_clocking_item(&item),
+            mem_store.start_item(&item),
             false,
             "Adding the same item twice should fail."
         );
 
-        let in_store_items = mem_store.query_clocking(&start_time, None);
+        let in_store_items = mem_store.query(&start_time, None);
         assert_eq!(
             in_store_items.len(),
             0,
@@ -231,15 +222,15 @@ mod tests {
 
         let end = Utc::now();
         let note = "A note";
-        assert_eq!(mem_store.finish_clocking_item(&item.id, &end, &note), true);
+        assert_eq!(mem_store.finish_item(&item.id, &end, &note), true);
         //finish again
         assert_eq!(
-            mem_store.finish_clocking_item(&item.id, &end, &note),
+            mem_store.finish_item(&item.id, &end, &note),
             false,
-            "call finish_clocking_item on finished item should fail"
+            "call finish_item on finished item should fail"
         );
 
-        let in_store_items = mem_store.query_clocking(&start_time, None);
+        let in_store_items = mem_store.query(&start_time, None);
         assert_eq!(in_store_items.len(), 1);
 
         let expected_item = ClockingItem {
@@ -257,11 +248,11 @@ mod tests {
         // item0..5 starts from @now - 4d5min, @now -3d5min, ... @now - 5min
         let items = gen_items(5);
         for item in items.iter() {
-            assert!(mem_store.start_clocking_item(item));
+            assert!(mem_store.start_item(item));
         }
 
         // ends item1, item3, and item4
-        // after the finish_clocking_item calls, data should be like:
+        // after the finish_item calls, data should be like:
         //  0. @now - 4d5min, None
         //  1. @now - 3d5min, @today -3 + 5minutes
         //  2. @now - 2d5min, None
@@ -271,24 +262,24 @@ mod tests {
         let end_data = gen_end_data(&items, &indices);
         let add_note = "New note";
         for (end_item, end_time) in end_data.iter() {
-            assert!(mem_store.finish_clocking_item(&end_item.id, &end_time, add_note));
+            assert!(mem_store.finish_item(&end_item.id, &end_time, add_note));
         }
 
         // should return item 1, 3, 4
-        let query_result = mem_store.query_clocking(&items[0].id.start, None);
+        let query_result = mem_store.query(&items[0].id.start, None);
         assert_eq!(query_result.len(), 3);
         assert_eq!(query_result[0], gen_expected_item(&items[1], add_note));
         assert_eq!(query_result[1], gen_expected_item(&items[3], add_note));
         assert_eq!(query_result[2], gen_expected_item(&items[4], add_note));
 
         // should return item 3, 4
-        let query_result = mem_store.query_clocking(&items[2].id.start, None);
+        let query_result = mem_store.query(&items[2].id.start, None);
         assert_eq!(query_result.len(), 2);
         assert_eq!(query_result[0], gen_expected_item(&items[3], add_note));
         assert_eq!(query_result[1], gen_expected_item(&items[4], add_note));
 
         // should return item 3
-        let query_result = mem_store.query_clocking(&items[2].id.start, Some(items[4].id.start));
+        let query_result = mem_store.query(&items[2].id.start, Some(items[4].id.start));
         assert_eq!(query_result.len(), 1);
         assert_eq!(query_result[0], gen_expected_item(&items[3], add_note));
     }
@@ -304,12 +295,12 @@ mod tests {
         items[5].id.title = "Item 1".to_string();
         // now there are there Item 0 and there Item 1 in collection
         for item in items.iter() {
-            assert!(mem_store.start_clocking_item(item));
+            assert!(mem_store.start_item(item));
         }
 
         //finish the fouth 1 , which is a "Item 1"
         assert_eq!(&items[3].id.title, "Item 1");
-        assert!(mem_store.finish_clocking(&items[3].id, ""));
+        assert!(mem_store.finish(&items[3].id, ""));
 
         let r = mem_store.finish_latest_unfinished_by_title("Item 1", "");
         assert_eq!(Ok(true), r);
@@ -321,7 +312,7 @@ mod tests {
         }
         let end_data = gen_end_data(&items, &indices);
         for (end_item, end_time) in end_data.iter() {
-            assert!(mem_store.finish_clocking_item(&end_item.id, &end_time, ""));
+            assert!(mem_store.finish_item(&end_item.id, &end_time, ""));
         }
 
         // try finish Item 0 by title

@@ -54,12 +54,12 @@ impl Effort {
 }
 
 #[derive(Serialize, Debug)]
-pub struct ItemAgg {
+pub struct ItemEfforts {
     title: String,
     efforts: Vec<Effort>,
 }
 
-impl fmt::Display for ItemAgg {
+impl fmt::Display for ItemEfforts {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r = writeln!(f, "{}:", &self.title);
         for eff in self.efforts.iter() {
@@ -69,7 +69,7 @@ impl fmt::Display for ItemAgg {
     }
 }
 
-impl ItemAgg {
+impl ItemEfforts {
     fn total_span(&self) -> chrono::Duration {
         self.efforts
             .iter()
@@ -77,37 +77,24 @@ impl ItemAgg {
             .reduce(|acc, e| acc + e)
             .unwrap()
     }
-
-    fn daily_summary(&self) -> DateDurationMap {
-        let mut map: DateDurationMap = DateDurationMap::new();
-        for eff in self.efforts.iter() {
-            let start_date = eff.start.date_naive();
-            map.entry(start_date)
-                .and_modify(|dur| *dur = *dur + eff.span())
-                .or_insert(eff.span());
-        }
-
-        map
-    }
 }
 
 #[derive(Serialize, Debug)]
-pub struct ItemView {
-    agg_list: Vec<ItemAgg>,
-}
-impl fmt::Display for ItemView {
+pub struct DetailView(Vec<ItemEfforts>);
+
+impl fmt::Display for DetailView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r: fmt::Result = Ok(());
-        for agg in self.agg_list.iter() {
+        for agg in self.0.iter() {
             r = r.and_then(|_| writeln!(f, "{}", agg));
         }
         r
     }
 }
 
-impl ItemView {
+impl DetailView {
     pub fn new(items: &[ClockingItem]) -> Self {
-        let mut view_map: HashMap<String, ItemAgg> = HashMap::new();
+        let mut view_map: HashMap<String, ItemEfforts> = HashMap::new();
         for item in items.iter() {
             view_map
                 .entry(item.id.title.clone())
@@ -117,7 +104,7 @@ impl ItemView {
                         end: item.end.unwrap().with_timezone(&Local),
                     });
                 })
-                .or_insert(ItemAgg {
+                .or_insert(ItemEfforts {
                     title: item.id.title.clone(),
                     efforts: vec![Effort {
                         start: item.id.start.with_timezone(&Local),
@@ -126,83 +113,94 @@ impl ItemView {
                 });
         }
 
-        ItemView {
-            agg_list: view_map.into_values().collect(),
-        }
+        DetailView(view_map.into_values().collect())
     }
+}
 
-    fn daily_view(&self) -> DateDurationMap {
-        let mut daily_view: DateDurationMap = Map::new();
-        for agg_summary in self.agg_list.iter().map(|agg| agg.daily_summary()) {
-            for (date, duration) in agg_summary.iter() {
-                daily_view
-                    .entry(*date)
-                    .and_modify(|dur| *dur = *dur + *duration)
-                    .or_insert(*duration);
-            }
-        }
+#[derive(Debug)]
+pub struct DailySummaryView(DateDurationMap);
 
-        daily_view
-    }
-
-    fn daily_view_detail(&self) -> Map<NaiveDate, TitleDurationMap> {
-        let mut daily_view: Map<NaiveDate, TitleDurationMap> = Map::new();
-        for (title, agg_summary) in self
-            .agg_list
-            .iter()
-            .map(|agg| (&agg.title, agg.daily_summary()))
-        {
-            for (date, duration) in agg_summary.iter() {
-                daily_view
-                    .entry(*date)
-                    .and_modify(|item_group| {
-                        item_group
-                            .entry(title.to_string())
-                            .and_modify(|dur| *dur = *dur + *duration)
-                            .or_insert(*duration);
-                    })
-                    .or_insert_with(|| {
-                        let mut map: TitleDurationMap = TitleDurationMap::new();
-                        map.insert(title.to_string(), *duration);
-                        map
-                    });
-            }
+impl DailySummaryView {
+    pub fn new(items: &[ClockingItem]) -> Self {
+        let mut view: DateDurationMap = Map::new();
+        for item in items.iter() {
+            let duration = item
+                .end
+                .expect("Item used in view should be in finished status.")
+                - item.id.start;
+            let start = item.id.start.date_naive();
+            view.entry(start)
+                .and_modify(|dur| *dur = *dur + duration)
+                .or_insert(duration);
         }
 
-        daily_view
+        DailySummaryView(view)
     }
+}
 
-    pub fn daily_summary(&self) -> String {
-        let mut r = String::new();
+impl fmt::Display for DailySummaryView {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut r: fmt::Result = Ok(());
         let mut daily_total = chrono::Duration::days(0);
-        let daily_view = self.daily_view();
-        for (date, duration) in daily_view.iter() {
-            r.push_str(&format!("{}: {}\n", date, strify_duration(duration)));
+        for (date, duration) in self.0.iter() {
+            r = r.and_then(|_| writeln!(f, "{}: {}", date, strify_duration(duration)));
             daily_total = daily_total + *duration;
         }
 
-        if daily_view.len() > 1 {
-            r.push_str(&format!("(Total): {}\n", strify_duration(&daily_total)));
+        if self.0.len() > 1 {
+            r = r.and_then(|_| writeln!(f, "(Total): {}", strify_duration(&daily_total)));
         }
         r
     }
+}
 
-    pub fn daily_summary_detail(&self) -> String {
-        let mut r = String::new();
+#[derive(Debug)]
+pub struct DailyDetailView(Map<NaiveDate, TitleDurationMap>);
+impl DailyDetailView {
+    pub fn new(items: &[ClockingItem]) -> Self {
+        let mut view: Map<NaiveDate, TitleDurationMap> = Map::new();
+        for item in items.iter() {
+            let duration = item
+                .end
+                .expect("Item used in view should be in finished status.")
+                - item.id.start;
+            let start = item.id.start.date_naive();
+            view.entry(start)
+                .and_modify(|inner_map| {
+                    inner_map
+                        .entry(item.id.title.clone())
+                        .and_modify(|dur| *dur = *dur + duration)
+                        .or_insert(duration);
+                })
+                .or_insert_with(|| {
+                    let mut inner_map: TitleDurationMap = TitleDurationMap::new();
+                    inner_map.insert(item.id.title.clone(), duration);
+                    inner_map
+                });
+        }
+
+        DailyDetailView(view)
+    }
+}
+
+impl fmt::Display for DailyDetailView {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut r: fmt::Result = Ok(());
         let mut total_duration = chrono::Duration::days(0);
-        let daily_view = self.daily_view_detail();
-        for (date, detail) in daily_view.iter() {
-            r.push_str(&format!("{date}: \n"));
+        for (date, detail) in self.0.iter() {
+            r = r.and_then(|_| writeln!(f, "{date}: "));
+
             let mut daily_total = chrono::Duration::days(0);
             for (title, duration) in detail.iter() {
-                r.push_str(&format!("\t{title}: {}\n", strify_duration(duration)));
+                r = r.and_then(|_| writeln!(f, "\t{title}: {}", strify_duration(duration)));
                 daily_total = daily_total + *duration;
             }
-            r.push_str(&format!("\t(Total): {}\n\n", strify_duration(&daily_total)));
+
+            r = r.and_then(|_| writeln!(f, "\t(Total): {}\n", strify_duration(&daily_total)));
             total_duration = total_duration + daily_total;
         }
-        if daily_view.len() > 1 {
-            r.push_str(&format!("(Total): {}\n", strify_duration(&total_duration)));
+        if self.0.len() > 1 {
+            r = r.and_then(|_| writeln!(f, "(Total): {}", strify_duration(&total_duration)));
         }
         r
     }
@@ -219,7 +217,7 @@ mod tests {
         let mut items_2 = gen_finished_items(5);
         items_2.extend_from_slice(&items);
 
-        let item_view = ItemView::new(&items_2);
+        let item_view = DetailView::new(&items_2);
         let s = item_view.to_string();
         println!("Data: {:#?}", &item_view);
         println!("{s}");
