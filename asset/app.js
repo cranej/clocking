@@ -8,7 +8,7 @@ createApp({
             error: null,
             newStart: '',
             report: null,
-            queryParam: {'startOffset': "0", "days": ""},
+            queryParam: {'startOffset': "0", "days": "", 'viewType': "daily_detail"},
         }
     },
 
@@ -63,10 +63,10 @@ createApp({
                        }
                    }).catch((err) => this.error = err))
         },
-        async getReport(offset, days) {
+        async getReport(offset, days, viewType) {
             let offsetParam = isNaN(parseInt(offset, 10)) ? "0" : offset;
             let daysParam = isNaN(parseInt(days, 10)) ? "null" : days;
-            let url = `/api/report/${offsetParam}/${daysParam}`;
+            let url = `/api/report/${offsetParam}/${daysParam}?view_type=${viewType}`;
             this.report = await (await fetch(url)).text();
         },
         async getItemDetail(title) {

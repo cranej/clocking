@@ -64,17 +64,29 @@ pub fn api_finish(title: &str, notes: String, config: &State<ServerConfig>) -> S
     }
 }
 
-#[get("/report/<offset>/<days>")]
-pub fn api_report(offset: u64, days: Option<u64>, config: &State<ServerConfig>) -> String {
+#[get("/report/<offset>/<days>?<view_type>")]
+pub fn api_report(
+    offset: u64,
+    days: Option<u64>,
+    view_type: &str,
+    config: &State<ServerConfig>,
+) -> String {
     let items = config.new_store().query_offset(offset, days);
-    let view = views::DailyDetailView::new(&items);
-    view.to_string()
+    if view_type == "daily" {
+        let view = views::DailySummaryView::new(&items);
+        view.to_string()
+    } else if view_type == "detail" {
+        let view = views::ItemDetailView::new(&items);
+        view.to_string()
+    } else if view_type == "dist" {
+        let view = views::DailyDistributionView::new(&items);
+        view.to_string()
+    } else {
+        // default to view type 'daily_detail'
+        let view = views::DailyDetailView::new(&items);
+        view.to_string()
+    }
 }
-/*
-#[get("/api/report")]
-#[get("/api/report/daily")]
-#[get("/api/report/detail")]
-*/
 
 #[get("/")]
 pub fn index() -> (ContentType, String) {

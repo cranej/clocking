@@ -73,19 +73,32 @@
 
           <div>
             <h2>Report</h2>
-            <form class="pure-form pure-form-stacked">
-              <fieldset>
-                <label for="report-offset">Start Offset</label>
-                <input type="number" id="report-offset" placeholder="Day offset" min="0" v-model="queryParam.startOffset"/>
-                <label for="report-days">Days</label>
-                <input type="number" id="report-days" placeholder="Days" min="1" v-model="queryParam.days"/>
-                <button class="pure-button pure-button-primary" @click.prevent="getReport(queryParam.startOffset, queryParam.days)">Go</button>
-              </fieldset>
-            </form>
             <div class="pure-g">
-              <div class="pure-u-1-3"><a href="#" @click.prevent="getReport(0,'null')">Today</a></div>
-              <div class="pure-u-1-3"><a href="#" @click.prevent="getReport(1, 'null')">Last 2 days</a></div>
-              <div class="pure-u-1-3"><a href="#" @click.prevent="getReport(6, 'null')">Last 7 days</a></div>
+              <form class="pure-u-1-2 pure-form pure-form-stacked">
+                <fieldset>
+                  <label for="report-offset">Start Offset</label>
+                  <input type="number" id="report-offset" placeholder="Day offset" min="0" v-model="queryParam.startOffset"/>
+                  <label for="report-days">Days</label>
+                  <input type="number" id="report-days" placeholder="Days" min="1" v-model="queryParam.days"/>
+                  <button class="pure-button pure-button-primary" @click.prevent="getReport(queryParam.startOffset, queryParam.days, queryParam.viewType)">Go</button>
+                </fieldset>
+              </form>
+              <form class="pure-u-1-2 pure-form pure-form-stacked">
+                <fieldset>
+                  <label for="report-type">Report Type</label>
+                  <select id="report-type" v-model="queryParam.viewType" style="padding: 0.2em 0.6em;">
+                    <option value="daily_detail">Daily Detail</option>
+                    <option value="daily">Daily Summary</option>
+                    <option value="detail">Item Detail</option>
+                    <option value="dist">Daily Distribution</option>
+                  </select>
+                </fieldset>
+              </form>
+            </div>
+            <div class="pure-g">
+              <div class="pure-u-1-3"><a href="#" @click.prevent="getReport(0,'null', queryParam.viewType)">Today</a></div>
+              <div class="pure-u-1-3"><a href="#" @click.prevent="getReport(1, 'null', queryParam.viewType)">Last 2 days</a></div>
+              <div class="pure-u-1-3"><a href="#" @click.prevent="getReport(6, 'null', queryParam.viewType)">Last 7 days</a></div>
             </div>
             <div v-if="report">
               <pre>{{report}}</pre>
