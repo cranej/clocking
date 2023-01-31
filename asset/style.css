@@ -18,3 +18,12 @@
 .l-box {
     padding: 1em;
 }
+
+.quick-report {
+    margin-bottom: 0.2em;
+}
+
+pre {
+    overflow: scroll;
+    white-space: pre-wrap;
+}
