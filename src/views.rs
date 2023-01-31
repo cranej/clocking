@@ -1,114 +1,28 @@
-use crate::ClockingItem;
+use crate::{strify_duration, ClockingItem, Effort};
 use chrono::prelude::*;
 use serde::Serialize;
 use std::cmp::Ordering;
-use std::collections::{BTreeMap as Map, HashMap};
+use std::collections::BTreeMap as Map;
 use std::fmt;
 
 type TitleDurationMap = Map<String, chrono::Duration>;
 type DateDurationMap = Map<NaiveDate, chrono::Duration>;
 
-const HOUR_MINUTES: i64 = 60;
-const DAY_MINUTES: i64 = HOUR_MINUTES * 24;
-fn strify_duration(d: &chrono::Duration) -> String {
-    let total_minutes = d.num_minutes();
-    if total_minutes < HOUR_MINUTES {
-        format!("0:{:0>2}", total_minutes)
-    } else if total_minutes < DAY_MINUTES {
-        let hours = total_minutes / HOUR_MINUTES;
-        let minutes = total_minutes % HOUR_MINUTES;
-        format!("{}:{:0>2}", hours, minutes)
-    } else {
-        let days = total_minutes / DAY_MINUTES;
-        let remains = total_minutes % DAY_MINUTES;
-        let hours = remains / HOUR_MINUTES;
-        let minutes = remains % HOUR_MINUTES;
-
-        format!("{}:{:0>2}:{:0>2}", days, hours, minutes)
-    }
-}
-
-#[derive(Serialize, Debug, Eq, PartialEq, Clone)]
-pub struct Effort {
-    start: DateTime<Local>,
-    end: DateTime<Local>,
-}
-
-impl Ord for Effort {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.start.cmp(&other.start)
-    }
-}
-
-impl PartialOrd for Effort {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.start.cmp(&other.start))
-    }
-}
-
-const LOCAL_FORMAT: &str = "%Y-%m-%d %a %H:%M";
-const LOCAL_NO_DATE_FORMAT: &str = "%H:%M";
-impl fmt::Display for Effort {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let time_format = if f.alternate() {
-            LOCAL_NO_DATE_FORMAT
-        } else {
-            LOCAL_FORMAT
-        };
-
-        let dur_string = strify_duration(&self.span());
-        write!(
-            f,
-            "{} ~ {}, {}",
-            self.start.format(time_format),
-            self.end.format(time_format),
-            dur_string
-        )
-    }
-}
-
-impl Effort {
-    fn span(&self) -> chrono::Duration {
-        self.end - self.start
-    }
-}
-
-/// [`Effort`] collection of give [`ItemEfforts::key`]
-#[derive(Serialize, Debug)]
-pub struct ItemEfforts {
-    pub key: String,
-    pub efforts: Vec<Effort>,
-}
-
-impl fmt::Display for ItemEfforts {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut r = writeln!(f, "{}:", &self.key);
-        for eff in self.efforts.iter() {
-            r = r.and_then(|_| writeln!(f, "\t{}", eff));
-        }
-        r.and_then(|_| writeln!(f, "\t(Total): {}", strify_duration(&self.total_span())))
-    }
-}
-
-impl ItemEfforts {
-    fn total_span(&self) -> chrono::Duration {
-        self.efforts
-            .iter()
-            .map(|e| e.span())
-            .reduce(|acc, e| acc + e)
-            .unwrap()
-    }
-}
-
 /// `ItemDetailView` groups detailed `Effort` (start, end) by `ClockingItem` title.
 #[derive(Serialize, Debug)]
-pub struct ItemDetailView(Vec<ItemEfforts>);
+pub struct ItemDetailView(Map<String, Vec<Effort>>);
 
 impl fmt::Display for ItemDetailView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r: fmt::Result = Ok(());
-        for agg in self.0.iter() {
-            r = r.and_then(|_| writeln!(f, "{}", agg));
+        for (title, efforts) in self.0.iter() {
+            r = r.and_then(|_| writeln!(f, "{}:", title));
+            let mut total_duration: chrono::Duration = chrono::Duration::days(0);
+            for eff in efforts.iter() {
+                r = r.and_then(|_| writeln!(f, "\t{}", eff));
+                total_duration = total_duration + eff.span();
+            }
+            r = r.and_then(|_| writeln!(f, "\t(Total): {}\n", strify_duration(&total_duration)))
         }
         r
     }
@@ -116,26 +30,22 @@ impl fmt::Display for ItemDetailView {
 
 impl ItemDetailView {
     pub fn new(items: &[ClockingItem]) -> Self {
-        let mut view_map: HashMap<String, ItemEfforts> = HashMap::new();
+        let mut view: Map<String, Vec<Effort>> = Map::new();
         for item in items.iter() {
-            view_map
-                .entry(item.id.title.clone())
-                .and_modify(|agg| {
-                    agg.efforts.push(Effort {
+            view.entry(item.id.title.clone())
+                .and_modify(|efforts| {
+                    efforts.push(Effort {
                         start: item.id.start.with_timezone(&Local),
                         end: item.end.unwrap().with_timezone(&Local),
                     });
                 })
-                .or_insert(ItemEfforts {
-                    key: item.id.title.clone(),
-                    efforts: vec![Effort {
-                        start: item.id.start.with_timezone(&Local),
-                        end: item.end.unwrap().with_timezone(&Local),
-                    }],
-                });
+                .or_insert(vec![Effort {
+                    start: item.id.start.with_timezone(&Local),
+                    end: item.end.unwrap().with_timezone(&Local),
+                }]);
         }
 
-        ItemDetailView(view_map.into_values().collect())
+        ItemDetailView(view)
     }
 }
 
