@@ -6,6 +6,7 @@
 - [x] finish latest unfinished work
 - [x] web server mode
 - [x] list recent work names when starting clocking
+- [x] daily distribution view
 - [ ] daily chart
 - [ ] report weekly view
 - [ ] support filtering item name when reporting

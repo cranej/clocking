@@ -28,7 +28,7 @@ fn strify_duration(d: &chrono::Duration) -> String {
     }
 }
 
-#[derive(Serialize, Debug, Eq, PartialEq)]
+#[derive(Serialize, Debug, Eq, PartialEq, Clone)]
 pub struct Effort {
     start: DateTime<Local>,
     end: DateTime<Local>,
@@ -230,67 +230,91 @@ impl fmt::Display for DailyDetailView {
     }
 }
 
-/// `DailyDistributionView` groups `Vec<Effort>` by local naive date of `ClockingItem` start.
+#[derive(Serialize, Debug, Eq, PartialEq, Clone)]
+struct EffortWithTitle(Effort, String);
+impl Ord for EffortWithTitle {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl PartialOrd for EffortWithTitle {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.0.cmp(&other.0))
+    }
+}
+
+/// `DailyDistributionView` groups sorted `Vec<Effort>` by local naive date of `ClockingItem` start.
 #[derive(Debug)]
-pub struct DailyDistributionView(Map<NaiveDate, Vec<Effort>>);
+pub struct DailyDistributionView(Map<NaiveDate, Vec<EffortWithTitle>>);
 impl DailyDistributionView {
     pub fn new(items: &[ClockingItem]) -> Self {
-        let mut view: Map<NaiveDate, Vec<Effort>> = Map::new();
+        let mut view: Map<NaiveDate, Vec<EffortWithTitle>> = Map::new();
         for item in items.iter() {
             let start_date = item.id.start.with_timezone(&Local).date_naive();
             view.entry(start_date)
                 .and_modify(|efforts| {
-                    efforts.push(Effort {
+                    efforts.push(EffortWithTitle(
+                        Effort {
+                            start: item.id.start.with_timezone(&Local),
+                            end: item.end.unwrap().with_timezone(&Local),
+                        },
+                        item.id.title.clone(),
+                    ));
+                })
+                .or_insert(vec![EffortWithTitle(
+                    Effort {
                         start: item.id.start.with_timezone(&Local),
                         end: item.end.unwrap().with_timezone(&Local),
-                    });
-                })
-                .or_insert(vec![Effort {
-                    start: item.id.start.with_timezone(&Local),
-                    end: item.end.unwrap().with_timezone(&Local),
-                }]);
+                    },
+                    item.id.title.clone(),
+                )]);
         }
 
-        DailyDistributionView(view)
-    }
-
-    pub fn idle(&mut self) -> Self {
         let today_naive = Local::now().date_naive();
         let local_fixed_offset = Local.offset_from_local_date(&today_naive).unwrap();
 
         let day_start_time = chrono::naive::NaiveTime::from_hms_opt(8, 0, 0).unwrap();
         let day_end_time = chrono::naive::NaiveTime::from_hms_opt(21, 0, 0).unwrap();
 
-        let spare_view: Map<NaiveDate, Vec<Effort>> = self
-            .0
+        let idle_title = "<idle>".to_string();
+        let view = view
             .iter_mut()
             .map(|(date, efforts)| {
-                let mut current_dt = date.and_time(day_start_time);
-                let mut spare_spans: Vec<Effort> = vec![];
                 efforts.sort();
+                let mut current_dt = date.and_time(day_start_time);
+                let mut with_idles_sorted: Vec<EffortWithTitle> = vec![];
                 for eff in efforts.iter() {
-                    if current_dt < eff.start.naive_local() {
-                        spare_spans.push(Effort {
-                            start: DateTime::from_local(current_dt, local_fixed_offset),
-                            end: eff.start,
-                        });
-                        current_dt = eff.end.naive_local();
+                    if current_dt < eff.0.start.naive_local() {
+                        with_idles_sorted.push(EffortWithTitle(
+                            Effort {
+                                start: DateTime::from_local(current_dt, local_fixed_offset),
+                                end: eff.0.start,
+                            },
+                            idle_title.clone(),
+                        ));
+                        current_dt = eff.0.end.naive_local();
                     }
+
+                    with_idles_sorted.push(eff.clone());
                 }
 
                 let day_end_dt = date.and_time(day_end_time);
                 if current_dt < day_end_dt {
-                    spare_spans.push(Effort {
-                        start: DateTime::from_local(current_dt, local_fixed_offset),
-                        end: DateTime::from_local(day_end_dt, local_fixed_offset),
-                    });
+                    with_idles_sorted.push(EffortWithTitle(
+                        Effort {
+                            start: DateTime::from_local(current_dt, local_fixed_offset),
+                            end: DateTime::from_local(day_end_dt, local_fixed_offset),
+                        },
+                        idle_title.clone(),
+                    ));
                 }
 
-                (*date, spare_spans)
+                (*date, with_idles_sorted)
             })
             .collect();
 
-        DailyDistributionView(spare_view)
+        DailyDistributionView(view)
     }
 }
 
@@ -301,11 +325,11 @@ impl fmt::Display for DailyDistributionView {
             r = r.and_then(|_| writeln!(f, "{date}: "));
             if f.alternate() {
                 for eff in efforts.iter() {
-                    r = r.and_then(|_| writeln!(f, "\t{eff:#}"));
+                    r = r.and_then(|_| writeln!(f, "\t{:#}: {}", eff.0, eff.1));
                 }
             } else {
-                for eff in efforts.iter().filter(|eff| eff.span().num_minutes() > 0) {
-                    r = r.and_then(|_| writeln!(f, "\t{eff:#}"));
+                for eff in efforts.iter().filter(|eff| eff.0.span().num_minutes() > 0) {
+                    r = r.and_then(|_| writeln!(f, "\t{:#}: {}", eff.0, eff.1));
                 }
             }
         }

@@ -50,9 +50,9 @@ enum Commands {
         ///Show detail report
         #[arg(long)]
         detail: bool,
-        /// Show idle time spans
-        #[arg(long)]
-        idle: bool,
+        /// Show daily distribution
+        #[arg(long = "dist")]
+        daily_dist: bool,
         ///<Unimplemented yet>.
         #[arg(long)]
         filter: Option<String>,
@@ -130,7 +130,7 @@ async fn main() {
             days,
             daily_summary,
             detail,
-            idle,
+            daily_dist,
             ..
         } => {
             let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
@@ -142,10 +142,9 @@ async fn main() {
             } else if detail {
                 let view = clocking::views::ItemDetailView::new(&items);
                 println!("{view}");
-            } else if idle {
-                let mut view = clocking::views::DailyDistributionView::new(&items);
-                let idle_view = view.idle();
-                println!("{idle_view}");
+            } else if daily_dist {
+                let view = clocking::views::DailyDistributionView::new(&items);
+                println!("{view}");
             } else {
                 let view = clocking::views::DailyDetailView::new(&items);
                 println!("{view}");
