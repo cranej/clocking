@@ -1,8 +1,8 @@
+use crate::strify_duration;
 use chrono::prelude::*;
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::fmt;
-use crate::strify_duration;
 
 /// Identify an unique clocking entity
 #[derive(Serialize, PartialEq, Clone, Debug)]
@@ -76,7 +76,7 @@ pub(crate) struct TimeSpan {
 impl TimeSpan {
     pub fn build(start: DateTime<Local>, end: DateTime<Local>) -> Result<Self, &'static str> {
         if end > start {
-            Ok(TimeSpan{ start, end })
+            Ok(TimeSpan { start, end })
         } else {
             Err("Invalid TimeSpan: end must after start.")
         }
@@ -84,6 +84,14 @@ impl TimeSpan {
 
     pub fn duration(&self) -> chrono::Duration {
         self.end - self.start
+    }
+
+    pub fn start(&self) -> DateTime<Local> {
+        self.start
+    }
+
+    pub fn end(&self) -> DateTime<Local> {
+        self.end
     }
 }
 

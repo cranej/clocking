@@ -95,10 +95,10 @@
               </form>
               <div class="pure-u-1-2" style="padding: 1em 0; text-align: right;">
                 <div class="quick-report">Quick Reports:</div>
-                <div class="quick-report"><a href="#" @click.prevent="getReport(0,'null', queryParam.viewType)">Today</a></div>
-                <div class="quick-report"><a href="#" @click.prevent="getReport(1, 1, queryParam.viewType)">Yesterday</a></div>
-                <div class="quick-report"><a href="#" @click.prevent="getReport(1, 'null', queryParam.viewType)">Last 2 days</a></div>
-                <div class="quick-report"><a href="#" @click.prevent="getReport(6, 'null', queryParam.viewType)">Last 7 days</a></div>
+                <div class="quick-report"><a href="#" @click.prevent="onQuickReport('0','null')">Today</a></div>
+                <div class="quick-report"><a href="#" @click.prevent="onQuickReport('1', '1')">Yesterday</a></div>
+                <div class="quick-report"><a href="#" @click.prevent="onQuickReport('1', 'null')">Last 2 days</a></div>
+                <div class="quick-report"><a href="#" @click.prevent="onQuickReport('6', 'null')">Last 7 days</a></div>
               </div>
 
             </div>

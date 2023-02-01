@@ -1,4 +1,5 @@
-use crate::{strify_duration, ClockingItem, Effort};
+use crate::strify_duration;
+use crate::types::*;
 use chrono::prelude::*;
 use serde::Serialize;
 use std::cmp::Ordering;
@@ -8,11 +9,11 @@ use std::fmt;
 type TitleDurationMap = Map<String, chrono::Duration>;
 type DateDurationMap = Map<NaiveDate, chrono::Duration>;
 
-/// `ItemDetailView` groups detailed `Effort` (start, end) by `ClockingItem` title.
+/// `EntryDetailView` groups detailed `Effort` (start, end) by `FinishedEntry` title.
 #[derive(Serialize, Debug)]
-pub struct ItemDetailView(Map<String, Vec<Effort>>);
+pub struct EntryDetailView(Map<String, Vec<TimeSpan>>);
 
-impl fmt::Display for ItemDetailView {
+impl fmt::Display for EntryDetailView {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r: fmt::Result = Ok(());
         for (title, efforts) in self.0.iter() {
@@ -20,7 +21,7 @@ impl fmt::Display for ItemDetailView {
             let mut total_duration: chrono::Duration = chrono::Duration::days(0);
             for eff in efforts.iter() {
                 r = r.and_then(|_| writeln!(f, "\t{}", eff));
-                total_duration = total_duration + eff.span();
+                total_duration = total_duration + eff.duration();
             }
             r = r.and_then(|_| writeln!(f, "\t(Total): {}\n", strify_duration(&total_duration)))
         }
@@ -28,40 +29,43 @@ impl fmt::Display for ItemDetailView {
     }
 }
 
-impl ItemDetailView {
-    pub fn new(items: &[ClockingItem]) -> Self {
-        let mut view: Map<String, Vec<Effort>> = Map::new();
-        for item in items.iter() {
-            view.entry(item.id.title.clone())
+impl EntryDetailView {
+    pub fn new(entries: &[FinishedEntry]) -> Self {
+        let mut view: Map<String, Vec<TimeSpan>> = Map::new();
+        for entry in entries.iter() {
+            view.entry(entry.id.title.clone())
                 .and_modify(|efforts| {
-                    efforts.push(Effort {
-                        start: item.id.start.with_timezone(&Local),
-                        end: item.end.unwrap().with_timezone(&Local),
-                    });
+                    efforts.push(
+                        TimeSpan::build(
+                            entry.id.start.with_timezone(&Local),
+                            entry.end.with_timezone(&Local),
+                        )
+                        .unwrap(),
+                    );
                 })
-                .or_insert(vec![Effort {
-                    start: item.id.start.with_timezone(&Local),
-                    end: item.end.unwrap().with_timezone(&Local),
-                }]);
+                .or_insert_with(|| {
+                    vec![TimeSpan::build(
+                        entry.id.start.with_timezone(&Local),
+                        entry.end.with_timezone(&Local),
+                    )
+                    .unwrap()]
+                });
         }
 
-        ItemDetailView(view)
+        EntryDetailView(view)
     }
 }
 
-/// `DailySummaryView` groups summarized [`chrono::Duration`] by local naive date of [`ClockingItem`] start.
+/// `DailySummaryView` groups summarized [`chrono::Duration`] by local naive date of [`FinishedEntry`] start.
 #[derive(Debug)]
 pub struct DailySummaryView(DateDurationMap);
 
 impl DailySummaryView {
-    pub fn new(items: &[ClockingItem]) -> Self {
+    pub fn new(entries: &[FinishedEntry]) -> Self {
         let mut view: DateDurationMap = Map::new();
-        for item in items.iter() {
-            let duration = item
-                .end
-                .expect("Item used in view should be in finished status.")
-                - item.id.start;
-            let start = item.id.start.with_timezone(&Local).date_naive();
+        for entry in entries.iter() {
+            let duration = entry.end - entry.id.start;
+            let start = entry.id.start.with_timezone(&Local).date_naive();
             view.entry(start)
                 .and_modify(|dur| *dur = *dur + duration)
                 .or_insert(duration);
@@ -87,28 +91,25 @@ impl fmt::Display for DailySummaryView {
     }
 }
 
-/// `DailyDetailView` groups `(ClockingItem::id::title, chrono::Duration)` by local naive date of `ClockingItem` start.
+/// `DailyDetailView` groups `(FinishedEntry::id::title, chrono::Duration)` by local naive date of `FinishedEntry` start.
 #[derive(Debug)]
 pub struct DailyDetailView(Map<NaiveDate, TitleDurationMap>);
 impl DailyDetailView {
-    pub fn new(items: &[ClockingItem]) -> Self {
+    pub fn new(entries: &[FinishedEntry]) -> Self {
         let mut view: Map<NaiveDate, TitleDurationMap> = Map::new();
-        for item in items.iter() {
-            let duration = item
-                .end
-                .expect("Item used in view should be in finished status.")
-                - item.id.start;
-            let start = item.id.start.with_timezone(&Local).date_naive();
+        for entry in entries.iter() {
+            let duration = entry.end - entry.id.start;
+            let start = entry.id.start.with_timezone(&Local).date_naive();
             view.entry(start)
                 .and_modify(|inner_map| {
                     inner_map
-                        .entry(item.id.title.clone())
+                        .entry(entry.id.title.clone())
                         .and_modify(|dur| *dur = *dur + duration)
                         .or_insert(duration);
                 })
                 .or_insert_with(|| {
                     let mut inner_map: TitleDurationMap = TitleDurationMap::new();
-                    inner_map.insert(item.id.title.clone(), duration);
+                    inner_map.insert(entry.id.title.clone(), duration);
                     inner_map
                 });
         }
@@ -141,44 +142,48 @@ impl fmt::Display for DailyDetailView {
 }
 
 #[derive(Serialize, Debug, Eq, PartialEq, Clone)]
-struct EffortWithTitle(Effort, String);
-impl Ord for EffortWithTitle {
+struct TimeSpanWithTitle(TimeSpan, String);
+impl Ord for TimeSpanWithTitle {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.cmp(&other.0)
     }
 }
 
-impl PartialOrd for EffortWithTitle {
+impl PartialOrd for TimeSpanWithTitle {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.0.cmp(&other.0))
     }
 }
 
-/// `DailyDistributionView` groups sorted `Vec<Effort>` by local naive date of `ClockingItem` start.
+/// `DailyDistributionView` groups sorted `Vec<Effort>` by local naive date of `FinishedEntry` start.
 #[derive(Debug)]
-pub struct DailyDistributionView(Map<NaiveDate, Vec<EffortWithTitle>>);
+pub struct DailyDistributionView(Map<NaiveDate, Vec<TimeSpanWithTitle>>);
 impl DailyDistributionView {
-    pub fn new(items: &[ClockingItem]) -> Self {
-        let mut view: Map<NaiveDate, Vec<EffortWithTitle>> = Map::new();
-        for item in items.iter() {
-            let start_date = item.id.start.with_timezone(&Local).date_naive();
+    pub fn new(entries: &[FinishedEntry]) -> Self {
+        let mut view: Map<NaiveDate, Vec<TimeSpanWithTitle>> = Map::new();
+        for entry in entries.iter() {
+            let start_date = entry.id.start.with_timezone(&Local).date_naive();
             view.entry(start_date)
                 .and_modify(|efforts| {
-                    efforts.push(EffortWithTitle(
-                        Effort {
-                            start: item.id.start.with_timezone(&Local),
-                            end: item.end.unwrap().with_timezone(&Local),
-                        },
-                        item.id.title.clone(),
+                    efforts.push(TimeSpanWithTitle(
+                        TimeSpan::build(
+                            entry.id.start.with_timezone(&Local),
+                            entry.end.with_timezone(&Local),
+                        )
+                        .unwrap(),
+                        entry.id.title.clone(),
                     ));
                 })
-                .or_insert(vec![EffortWithTitle(
-                    Effort {
-                        start: item.id.start.with_timezone(&Local),
-                        end: item.end.unwrap().with_timezone(&Local),
-                    },
-                    item.id.title.clone(),
-                )]);
+                .or_insert_with(|| {
+                    vec![TimeSpanWithTitle(
+                        TimeSpan::build(
+                            entry.id.start.with_timezone(&Local),
+                            entry.end.with_timezone(&Local),
+                        )
+                        .unwrap(),
+                        entry.id.title.clone(),
+                    )]
+                });
         }
 
         let today_naive = Local::now().date_naive();
@@ -193,17 +198,18 @@ impl DailyDistributionView {
             .map(|(date, efforts)| {
                 efforts.sort();
                 let mut current_dt = date.and_time(day_start_time);
-                let mut with_idles_sorted: Vec<EffortWithTitle> = vec![];
+                let mut with_idles_sorted: Vec<TimeSpanWithTitle> = vec![];
                 for eff in efforts.iter() {
-                    if current_dt < eff.0.start.naive_local() {
-                        with_idles_sorted.push(EffortWithTitle(
-                            Effort {
-                                start: DateTime::from_local(current_dt, local_fixed_offset),
-                                end: eff.0.start,
-                            },
+                    if current_dt < eff.0.start().naive_local() {
+                        with_idles_sorted.push(TimeSpanWithTitle(
+                            TimeSpan::build(
+                                DateTime::from_local(current_dt, local_fixed_offset),
+                                eff.0.start(),
+                            )
+                            .unwrap(),
                             idle_title.clone(),
                         ));
-                        current_dt = eff.0.end.naive_local();
+                        current_dt = eff.0.end().naive_local();
                     }
 
                     with_idles_sorted.push(eff.clone());
@@ -211,11 +217,12 @@ impl DailyDistributionView {
 
                 let day_end_dt = date.and_time(day_end_time);
                 if current_dt < day_end_dt {
-                    with_idles_sorted.push(EffortWithTitle(
-                        Effort {
-                            start: DateTime::from_local(current_dt, local_fixed_offset),
-                            end: DateTime::from_local(day_end_dt, local_fixed_offset),
-                        },
+                    with_idles_sorted.push(TimeSpanWithTitle(
+                        TimeSpan::build(
+                            DateTime::from_local(current_dt, local_fixed_offset),
+                            DateTime::from_local(day_end_dt, local_fixed_offset),
+                        )
+                        .unwrap(),
                         idle_title.clone(),
                     ));
                 }
@@ -238,46 +245,14 @@ impl fmt::Display for DailyDistributionView {
                     r = r.and_then(|_| writeln!(f, "\t{:#}: {}", eff.0, eff.1));
                 }
             } else {
-                for eff in efforts.iter().filter(|eff| eff.0.span().num_minutes() > 0) {
+                for eff in efforts
+                    .iter()
+                    .filter(|eff| eff.0.duration().num_minutes() > 0)
+                {
                     r = r.and_then(|_| writeln!(f, "\t{:#}: {}", eff.0, eff.1));
                 }
             }
         }
         r
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{ClockingItem, ClockingItemId};
-
-    #[test]
-    fn item_view_test() {
-        let items = gen_finished_items(3);
-        let mut items_2 = gen_finished_items(5);
-        items_2.extend_from_slice(&items);
-
-        let item_view = DetailView::new(&items_2);
-        let s = item_view.to_string();
-        println!("Data: {:#?}", &item_view);
-        println!("{s}");
-    }
-
-    fn gen_finished_items(count: usize) -> Vec<ClockingItem> {
-        let five_mins = chrono::Duration::minutes(5);
-        (0..count)
-            .map(|i| {
-                let start_offset = chrono::Duration::days((count - i - 1) as i64) + five_mins;
-                ClockingItem {
-                    id: ClockingItemId {
-                        title: format!("Item {i}"),
-                        start: Utc::now().checked_sub_signed(start_offset).unwrap(),
-                    },
-                    end: Some(Utc::now()),
-                    notes: format!("Init notes for item {i}\n"),
-                }
-            })
-            .collect()
     }
 }

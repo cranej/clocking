@@ -1,5 +1,9 @@
+//! Rocket request handlers.
 use crate::sqlite_store::SqliteStore;
-use crate::{views, ClockingItem, ClockingItemId, ClockingStore};
+use crate::{
+    types::{EntryId, FinishedEntry},
+    views, ClockingStore,
+};
 use rocket::{
     get,
     http::{ContentType, Status},
@@ -31,13 +35,19 @@ pub fn api_recent(config: &State<ServerConfig>) -> Json<Vec<String>> {
 }
 
 #[get("/latest/<title>")]
-pub fn api_latest(title: &str, config: &State<ServerConfig>) -> Json<Option<ClockingItem>> {
-    Json(config.new_store().latest(title))
+pub fn api_latest(title: &str, config: &State<ServerConfig>) -> Json<Option<FinishedEntry>> {
+    Json(config.new_store().latest_finished(title))
 }
 
 #[get("/unfinished")]
-pub fn api_unfinished(config: &State<ServerConfig>) -> Json<Vec<ClockingItemId>> {
-    Json(config.new_store().unfinished(10))
+pub fn api_unfinished(config: &State<ServerConfig>) -> Json<Vec<EntryId>> {
+    let r: Vec<EntryId> = config
+        .new_store()
+        .unfinished(10)
+        .iter()
+        .map(|x| x.id.clone())
+        .collect();
+    Json(r)
 }
 
 #[post("/start/<title>")]
@@ -54,10 +64,7 @@ pub fn api_start(title: &str, config: &State<ServerConfig>) -> Status {
 
 #[post("/finish/<title>", data = "<notes>")]
 pub fn api_finish(title: &str, notes: String, config: &State<ServerConfig>) -> Status {
-    match config
-        .new_store()
-        .finish_latest_unfinished_by_title(title, &notes)
-    {
+    match config.new_store().try_finish_title(title, &notes) {
         Ok(true) => Status::Ok,
         Ok(false) => Status::NotFound,
         Err(_) => Status::InternalServerError,
@@ -71,19 +78,19 @@ pub fn api_report(
     view_type: &str,
     config: &State<ServerConfig>,
 ) -> String {
-    let items = config.new_store().query_offset(offset, days);
+    let entries = config.new_store().finished_offset(offset, days);
     if view_type == "daily" {
-        let view = views::DailySummaryView::new(&items);
+        let view = views::DailySummaryView::new(&entries);
         view.to_string()
     } else if view_type == "detail" {
-        let view = views::ItemDetailView::new(&items);
+        let view = views::EntryDetailView::new(&entries);
         view.to_string()
     } else if view_type == "dist" {
-        let view = views::DailyDistributionView::new(&items);
+        let view = views::DailyDistributionView::new(&entries);
         view.to_string()
     } else {
         // default to view type 'daily_detail'
-        let view = views::DailyDetailView::new(&items);
+        let view = views::DailyDetailView::new(&entries);
         view.to_string()
     }
 }

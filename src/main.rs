@@ -97,7 +97,7 @@ async fn main() {
                     if !no_wait {
                         println!("(Ctrl-D to finish clocking)");
                         let notes = read_to_end();
-                        store.finish(&id, &notes);
+                        store.try_finish_entry_now(&id, &notes);
                         println!("(Finished)");
                     };
                 }
@@ -117,7 +117,7 @@ async fn main() {
 
             let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
             match title {
-                Ok(title) => match store.finish_latest_unfinished_by_title(&title, &notes) {
+                Ok(title) => match store.try_finish_title(&title, &notes) {
                     Ok(true) => println!("(Updated)"),
                     Ok(false) => println!("(No unfinished item found by {title})"),
                     Err(e) => eprintln!("Unexpected error: {e}"),
@@ -134,19 +134,19 @@ async fn main() {
             ..
         } => {
             let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-            let items = store.query_offset(from.unwrap_or(0), days);
+            let entries = store.finished_offset(from.unwrap_or(0), days);
 
             if daily_summary {
-                let view = clocking::views::DailySummaryView::new(&items);
+                let view = clocking::views::DailySummaryView::new(&entries);
                 println!("{view}");
             } else if detail {
-                let view = clocking::views::ItemDetailView::new(&items);
+                let view = clocking::views::EntryDetailView::new(&entries);
                 println!("{view}");
             } else if daily_dist {
-                let view = clocking::views::DailyDistributionView::new(&items);
+                let view = clocking::views::DailyDistributionView::new(&entries);
                 println!("{view}");
             } else {
-                let view = clocking::views::DailyDetailView::new(&items);
+                let view = clocking::views::DailyDetailView::new(&entries);
                 println!("{view}");
             }
         }
@@ -155,7 +155,7 @@ async fn main() {
 
             let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
             match title {
-                Ok(title) => match store.latest(&title) {
+                Ok(title) => match store.latest_finished(&title) {
                     Some(item) => println!("{item}"),
                     None => println!("(Not found)"),
                 },
@@ -214,7 +214,7 @@ async fn main() {
 fn handle_title(title: Option<String>, recent_titles: &[String]) -> Result<String, String> {
     let empty_title_err = "Empty title".to_string();
     title
-        .ok_or(empty_title_err.clone())
+        .ok_or_else(|| empty_title_err.clone())
         .and_then(|x| {
             if x.is_empty() {
                 Err(empty_title_err.clone())
@@ -222,7 +222,7 @@ fn handle_title(title: Option<String>, recent_titles: &[String]) -> Result<Strin
                 Ok(x)
             }
         })
-        .or_else(|_| read_title(&recent_titles))
+        .or_else(|_| read_title(recent_titles))
 }
 
 fn read_title(recent_titles: &[String]) -> Result<String, String> {

@@ -74,11 +74,15 @@ createApp({
             let obj = await (await fetch(url)).json();
             if (obj != null) {
                 obj.id.start = new Date(obj.id.start).toLocaleString();
-                if (obj.end != null) {
-                    obj.end = new Date(obj.end).toLocaleString();
-                }
+                obj.end = new Date(obj.end).toLocaleString();
             }
             this.detailObject = obj;
+        },
+        onQuickReport(offset, days) {
+            this.queryParam.startOffset = offset;
+            this.queryParam.days = days;
+
+            this.getReport(offset, days, this.queryParam.viewType);
         }
     }
 }).mount("#layout");
