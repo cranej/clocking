@@ -8,12 +8,16 @@ createApp({
             error: null,
             newStart: '',
             report: null,
-            queryParam: {'startOffset': "0", "days": "", 'viewType': "daily_detail"},
+            queryParam: {'dayStart': "", "dayEnd": "", 'viewType': "daily_detail"},
         }
     },
 
     created() {
         this.getData();
+        // default value for queryParam.dayStart/dayEnd
+        let today = this.getDateString(new Date());
+        this.queryParam.dayStart = today;
+        this.queryParam.dayEnd = today;
     },
 
     methods: {
@@ -63,11 +67,14 @@ createApp({
                        }
                    }).catch((err) => this.error = err))
         },
-        async getReport(offset, days, viewType) {
-            let offsetParam = isNaN(parseInt(offset, 10)) ? "0" : offset;
-            let daysParam = isNaN(parseInt(days, 10)) ? "null" : days;
-            let url = `/api/report/${offsetParam}/${daysParam}?view_type=${viewType}`;
-            this.report = await (await fetch(url)).text();
+        async getReportByDate(dayStart, dayEnd, viewType) {
+            this.report = null;
+            if (dayStart == "" || dayEnd == "") {
+                this.error = "Query start and end must be specified.";
+            } else {
+                let url = `/api/report-by-date/${dayStart}/${dayEnd}?view_type=${viewType}`;
+                this.report = await (await fetch(url)).text();
+            }
         },
         async getItemDetail(title) {
             let url = `/api/latest/${encodeURI(title)}`;
@@ -79,10 +86,17 @@ createApp({
             this.detailObject = obj;
         },
         onQuickReport(offset, days) {
-            this.queryParam.startOffset = offset;
-            this.queryParam.days = days;
+            let one_day = 86400000;
+            let now_t = new Date().getTime();
+            let start_t = now_t - (parseInt(offset, 10) * one_day);
+            let end_t = days == 'null' ? now_t : (start_t + ((parseInt(days, 10) - 1) * one_day));
 
-            this.getReport(offset, days, this.queryParam.viewType);
+            this.queryParam.dayStart = this.getDateString(new Date(start_t));
+            this.queryParam.dayEnd = this.getDateString(new Date(end_t));
+            this.getReportByDate(this.queryParam.dayStart, this.queryParam.dayEnd, this.queryParam.viewType);
+        },
+        getDateString(d) {
+            return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
         }
     }
 }).mount("#layout");

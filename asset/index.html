@@ -76,11 +76,11 @@
             <div class="pure-g">
               <form class="pure-u-1-2 pure-form pure-form-stacked">
                 <fieldset>
-                  <label for="report-offset">Start Offset</label>
-                  <input type="number" id="report-offset" placeholder="Day offset" min="0" v-model="queryParam.startOffset"/>
+                  <label for="report-start">Start Offset</label>
+                  <input type="date" id="report-start" placeholder="Report start" v-model="queryParam.dayStart"/>
 
-                  <label for="report-days">Days</label>
-                  <input type="number" id="report-days" placeholder="Days" min="1" v-model="queryParam.days"/>
+                  <label for="report-end">Days</label>
+                  <input type="date" id="report-end" placeholder="Report end" v-model="queryParam.dayEnd"/>
 
                   <label for="report-type">Report Type</label>
                   <select id="report-type" v-model="queryParam.viewType" style="padding: 0.2em 0.6em;">
@@ -90,7 +90,7 @@
                     <option value="dist">Daily Distribution</option>
                   </select>
 
-                  <button class="pure-button pure-button-primary" @click.prevent="getReport(queryParam.startOffset, queryParam.days, queryParam.viewType)">Go</button>
+                  <button class="pure-button pure-button-primary" @click.prevent="getReportByDate(queryParam.dayStart, queryParam.dayEnd, queryParam.viewType)">Go</button>
                 </fieldset>
               </form>
               <div class="pure-u-1-2" style="padding: 1em 0; text-align: right;">
@@ -100,7 +100,6 @@
                 <div class="quick-report"><a href="#" @click.prevent="onQuickReport('1', 'null')">Last 2 days</a></div>
                 <div class="quick-report"><a href="#" @click.prevent="onQuickReport('6', 'null')">Last 7 days</a></div>
               </div>
-
             </div>
             <div v-if="report">
               <pre>{{report}}</pre>
