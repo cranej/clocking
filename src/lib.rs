@@ -8,6 +8,7 @@ use types::*;
 
 type Result<T> = std::result::Result<T, String>;
 
+const NAIVE_DATE_FORMAT: &str = "%Y-%m-%d";
 pub trait ClockingStore {
     /// Start a clocking entry at now.
     fn start(&mut self, title: &str) -> Result<EntryId> {
@@ -61,9 +62,42 @@ pub trait ClockingStore {
     /// Query finished clocking entries from date range:
     ///   start: (@today - `days_offset`) 0:00:00
     ///   to: (@today - `days_offset` + days) 0:00:00 if days is not None, otherwise to now()
-    fn finished_offset(&self, days_offset: u64, days: Option<u64>) -> Vec<FinishedEntry> {
+    fn finished_by_offset(&self, days_offset: u64, days: Option<u64>) -> Vec<FinishedEntry> {
         let (start, end) = store_helper::query_start_end(days_offset, days);
         self.finished(&start, end)
+    }
+
+    /// Query finished clocking entries, accepts 'yyyy-mm-dd' local dates as query range.
+    ///
+    /// Note: `day_end` is included in the query range.
+    fn finished_by_date_str(
+        &self,
+        day_start: &str,
+        day_end: &str,
+    ) -> std::result::Result<Vec<FinishedEntry>, &'static str> {
+        let start_date = NaiveDate::parse_from_str(day_start, NAIVE_DATE_FORMAT)
+            .map_err(|_| "Invalid format of day_start")?;
+        let end_date = NaiveDate::parse_from_str(day_end, NAIVE_DATE_FORMAT)
+            .map_err(|_| "Invalid format of day_end")?;
+
+        if end_date < start_date {
+            Err("Invalid date range: day_end must not before day_start")
+        } else {
+            let today_naive = Local::now().date_naive();
+            let local_fixed_offset = Local.offset_from_local_date(&today_naive).unwrap();
+            let start_dt = DateTime::<FixedOffset>::from_local(
+                start_date.and_hms_opt(0, 0, 0).unwrap(),
+                local_fixed_offset,
+            )
+            .with_timezone(&Utc);
+            let end_dt = DateTime::<FixedOffset>::from_local(
+                end_date.and_hms_opt(23, 59, 59).unwrap(),
+                local_fixed_offset,
+            )
+            .with_timezone(&Utc);
+
+            Ok(self.finished(&start_dt, Some(end_dt)))
+        }
     }
 
     /// Fetch latest-started finished clocking entries by title.

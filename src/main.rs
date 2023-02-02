@@ -134,7 +134,7 @@ async fn main() {
             ..
         } => {
             let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-            let entries = store.finished_offset(from.unwrap_or(0), days);
+            let entries = store.finished_by_offset(from.unwrap_or(0), days);
 
             if daily_summary {
                 let view = clocking::views::DailySummaryView::new(&entries);
@@ -188,6 +188,7 @@ async fn main() {
                         clocking::server::api_start,
                         clocking::server::api_finish,
                         clocking::server::api_report,
+                        clocking::server::api_report_by_date,
                     ],
                 )
                 .mount(

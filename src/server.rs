@@ -78,7 +78,7 @@ pub fn api_report(
     view_type: &str,
     config: &State<ServerConfig>,
 ) -> String {
-    let entries = config.new_store().finished_offset(offset, days);
+    let entries = config.new_store().finished_by_offset(offset, days);
     if view_type == "daily" {
         let view = views::DailySummaryView::new(&entries);
         view.to_string()
@@ -92,6 +92,36 @@ pub fn api_report(
         // default to view type 'daily_detail'
         let view = views::DailyDetailView::new(&entries);
         view.to_string()
+    }
+}
+
+#[get("/report-by-date/<start>/<end>?<view_type>")]
+pub fn api_report_by_date(
+    start: &str,
+    end: &str,
+    view_type: &str,
+    config: &State<ServerConfig>,
+) -> (Status, String) {
+    match config.new_store().finished_by_date_str(start, end) {
+        Ok(entries) => {
+            let resp = if view_type == "daily" {
+                let view = views::DailySummaryView::new(&entries);
+                view.to_string()
+            } else if view_type == "detail" {
+                let view = views::EntryDetailView::new(&entries);
+                view.to_string()
+            } else if view_type == "dist" {
+                let view = views::DailyDistributionView::new(&entries);
+                view.to_string()
+            } else {
+                // default to view type 'daily_detail'
+                let view = views::DailyDetailView::new(&entries);
+                view.to_string()
+            };
+
+            (Status::Ok, resp)
+        }
+        Err(err) => (Status::BadRequest, err.to_string()),
     }
 }
 
