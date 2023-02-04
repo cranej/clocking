@@ -1,6 +1,6 @@
 # What is it
 
-A tool to help tracking the usage of your daily time.
+A tool helps tracking daily time usage.
 
 # Motivation
 

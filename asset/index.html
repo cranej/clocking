@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
   <head>
     <meta charset="UTF-8"/>
     <script src="./vue.js"></script>
@@ -38,7 +38,7 @@
           </div>
 
           <div v-if="recentTitles.length > 0">
-            <h2>Recent Titles: </h2>
+            <h2>Recent Entries: </h2>
             <div style="margin-bottom: 0.2em;" class="pure-g" v-for="title in recentTitles">
               <p class="pure-u-3-5" style="margin-top: 0;">
                 {{ title }}
@@ -76,17 +76,17 @@
             <div class="pure-g">
               <form class="pure-u-1-2 pure-form pure-form-stacked">
                 <fieldset>
-                  <label for="report-start">Start Offset</label>
+                  <label for="report-start">From (included)</label>
                   <input type="date" id="report-start" placeholder="Report start" v-model="queryParam.dayStart"/>
 
-                  <label for="report-end">Days</label>
+                  <label for="report-end">To (included)</label>
                   <input type="date" id="report-end" placeholder="Report end" v-model="queryParam.dayEnd"/>
 
                   <label for="report-type">Report Type</label>
                   <select id="report-type" v-model="queryParam.viewType" style="padding: 0.2em 0.6em;">
                     <option value="daily_detail">Daily Detail</option>
                     <option value="daily">Daily Summary</option>
-                    <option value="detail">Item Detail</option>
+                    <option value="detail">Entry Detail</option>
                     <option value="dist">Daily Distribution</option>
                   </select>
 
