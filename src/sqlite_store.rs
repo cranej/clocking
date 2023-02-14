@@ -44,7 +44,7 @@ impl SqliteStore {
             end: DateTime::parse_from_rfc3339(&end_string)
                 .unwrap()
                 .with_timezone(&Utc),
-            notes: row.get("notes").unwrap(),
+            notes: row.get("notes").unwrap_or_else(|_| String::new()),
         }
     }
 
@@ -57,7 +57,7 @@ impl SqliteStore {
                     .unwrap()
                     .with_timezone(&Utc),
             },
-            notes: row.get("notes").unwrap(),
+            notes: row.get("notes").unwrap_or_else(|_| String::new()),
         }
     }
 }

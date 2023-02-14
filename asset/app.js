@@ -77,13 +77,11 @@ createApp({
             }
         },
         async getItemDetail(title) {
-            let url = `/api/latest/${encodeURI(title)}`;
-            let obj = await (await fetch(url)).json();
-            if (obj != null) {
-                obj.id.start = new Date(obj.id.start).toLocaleString();
-                obj.end = new Date(obj.end).toLocaleString();
-            }
-            this.detailObject = obj;
+          let url = `/api/latest/${encodeURI(title)}`;
+          this.detailObject = await (await fetch(url)).text();
+          if (this.detailObject == "") {
+            this.detailObject = null;
+          }
         },
         onQuickReport(offset, days) {
             let one_day = 86400000;

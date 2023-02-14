@@ -1,9 +1,6 @@
 //! Rocket request handlers.
 use crate::sqlite_store::SqliteStore;
-use crate::{
-    types::{EntryId, FinishedEntry},
-    views, ClockingStore,
-};
+use crate::{types::EntryId, views, ClockingStore};
 use rocket::{
     get,
     http::{ContentType, Status},
@@ -35,8 +32,12 @@ pub fn api_recent(config: &State<ServerConfig>) -> Json<Vec<String>> {
 }
 
 #[get("/latest/<title>")]
-pub fn api_latest(title: &str, config: &State<ServerConfig>) -> Json<Option<FinishedEntry>> {
-    Json(config.new_store().latest_finished(title))
+pub fn api_latest(title: &str, config: &State<ServerConfig>) -> String {
+    config
+        .new_store()
+        .latest_finished(title)
+        .map(|entity| entity.html_segment())
+        .unwrap_or_else(|| String::new())
 }
 
 #[get("/unfinished")]

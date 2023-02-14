@@ -1,5 +1,6 @@
 use crate::strify_duration;
 use chrono::prelude::*;
+use pulldown_cmark::{html, Parser};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::fmt;
@@ -44,6 +45,24 @@ pub struct FinishedEntry {
     pub id: EntryId,
     pub end: DateTime<Utc>,
     pub notes: String,
+}
+
+impl FinishedEntry {
+    pub fn html_segment(&self) -> String {
+        let text = format!(
+            "## {}\n **{}** ~ **{}** \n\n {}",
+            &self.id.title,
+            self.id.start.with_timezone(&Local).format(TIME_FORMAT),
+            self.end.with_timezone(&Local).format(TIME_FORMAT),
+            &self.notes
+        );
+
+        let parser = Parser::new(&text);
+        let mut html_output = String::new();
+        html::push_html(&mut html_output, parser);
+
+        html_output
+    }
 }
 
 impl fmt::Display for FinishedEntry {
