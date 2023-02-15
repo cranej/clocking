@@ -37,7 +37,7 @@ pub fn api_latest(title: &str, config: &State<ServerConfig>) -> String {
         .new_store()
         .latest_finished(title)
         .map(|entity| entity.html_segment())
-        .unwrap_or_else(|| String::new())
+        .unwrap_or_else(String::new)
 }
 
 #[get("/unfinished")]

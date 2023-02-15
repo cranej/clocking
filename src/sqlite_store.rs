@@ -114,6 +114,22 @@ impl ClockingStore for SqliteStore {
             })
     }
 
+    fn try_finish_any(&mut self, notes: &str) -> Result<Option<String>> {
+        let end_string = Utc::now().to_rfc3339();
+        self.conn
+            .query_row(
+                "UPDATE clocking set end = ?, notes = IFNULL(notes, '')||? where id in (
+                    SELECT max(id) FROM clocking WHERE end is NULL
+            ) returning title",
+                [&end_string, notes],
+                |row| Ok(Some(row.get("title").unwrap())),
+            )
+            .or_else(|e| match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                other => Err(format!("Unexpected error: {other}")),
+            })
+    }
+
     fn try_finish_entry(&mut self, id: &EntryId, end: &DateTime<Utc>, notes: &str) -> bool {
         let start_string = id.start.to_rfc3339();
         let end_string = end.to_rfc3339();
@@ -221,7 +237,7 @@ mod tests {
 
         let finished_entry = FinishedEntry {
             id: entry.id.clone(),
-            end: end,
+            end,
             notes: String::from(note),
         };
 

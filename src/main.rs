@@ -30,8 +30,11 @@ enum Commands {
     },
     /// Finish latest unfinished clocking of title.
     Finish {
-        /// Title to finish. Choose interactively if not specified
+        /// Title to finish. Choose interactively if not specified unless `--any/-a` specified.
         title: Option<String>,
+        /// Don't expect a title, instead finish the latest unfinished entry
+        #[arg(short, long, default_value_t = false)]
+        any: bool,
         /// Can be specified multiple times, each as a separate line. Sinel value '-' means read from stdin.
         #[arg(short, long)]
         notes: Vec<String>,
@@ -106,7 +109,7 @@ async fn main() {
                 }
             };
         }
-        Commands::Finish { title, notes } => {
+        Commands::Finish { title, any, notes } => {
             let mut store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
 
             let notes = if notes.len() == 1 && notes[0] == "-" {
@@ -114,15 +117,22 @@ async fn main() {
             } else {
                 notes.join("\n")
             };
-
-            let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
-            match title {
-                Ok(title) => match store.try_finish_title(&title, &notes) {
-                    Ok(true) => println!("(Updated)"),
-                    Ok(false) => println!("(No unfinished item found by {title})"),
+            if !any {
+                let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
+                match title {
+                    Ok(title) => match store.try_finish_title(&title, &notes) {
+                        Ok(true) => println!("(Updated)"),
+                        Ok(false) => println!("(No unfinished item found by {title})"),
+                        Err(e) => eprintln!("Unexpected error: {e}"),
+                    },
+                    Err(err) => eprintln!("Error reading or choosing title: {err}."),
+                }
+            } else {
+                match store.try_finish_any(&notes) {
+                    Ok(Some(title)) => println!("(Finished: {title})"),
+                    Ok(None) => println!("(No unfinished item found)"),
                     Err(e) => eprintln!("Unexpected error: {e}"),
-                },
-                Err(err) => eprintln!("Error reading or choosing title: {err}."),
+                }
             }
         }
         Commands::Report {
