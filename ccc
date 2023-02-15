@@ -1,0 +1,9 @@
+#!/bin/sh
+
+CCC="/home/crane/.cargo/bin/clocking"
+case $(printf "start\nfinish\nreport\n" | dmenu -p "Action: ") in
+  start) title=$(dmenu -p "Title:"); $CCC start -n "$title" ;;
+  finish) $CCC finish -a ;;
+  report) urxvt -e sh -c "$CCC report | nvim -R" ;;
+esac
+
