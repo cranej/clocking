@@ -1,8 +1,18 @@
 #!/bin/sh
 
-CCC="/home/crane/.cargo/bin/clocking"
+if [[ "$1" = "-d" ]]
+then
+  CCC="/home/crane/workspace/clocking/target/debug/clocking --file /tmp/tracking.db"
+  echo "Cmd: $CCC"
+else
+  CCC="/home/crane/.cargo/bin/clocking --file /mnt/nas/home/data/tracking.db"
+fi
+
 case $(printf "start\nfinish\nreport\n" | dmenu -p "Action: ") in
-  start) title=$(dmenu -p "Title:"); $CCC start -n "$title" ;;
+  start)
+    title=$($CCC titles -i | dmenu -p "Title: ");
+    title=${title##*: };
+    [[ -n "$title" ]] && $CCC start -n "$title" ;;
   finish) $CCC finish -a ;;
   report) urxvt -e sh -c "$CCC report | nvim -R" ;;
 esac

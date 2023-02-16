@@ -32,7 +32,8 @@ enum Commands {
     Finish {
         /// Title to finish. Choose interactively if not specified unless `--any/-a` specified.
         title: Option<String>,
-        /// Don't expect a title, instead finish the latest unfinished entry
+        /// Don't expect a title, instead finish the latest one of any
+        /// unfinished entries.
         #[arg(short, long, default_value_t = false)]
         any: bool,
         /// Can be specified multiple times, each as a separate line. Sinel value '-' means read from stdin.
@@ -64,6 +65,15 @@ enum Commands {
     Latest {
         /// Title of the item to display. Choose interactively if not specified.
         title: Option<String>,
+    },
+    /// Show latest n titles
+    Titles {
+        /// Number of titles to show
+        #[arg(long, short, default_value_t = 5)]
+        number: usize,
+        /// If on, prefix titles by index start from 1
+        #[arg(long, short, default_value_t = false)]
+        index: bool,
     },
     /// Server mode
     Server {
@@ -172,6 +182,10 @@ async fn main() {
                 Err(err) => eprintln!("Error reading or choosing title: {err}."),
             }
         }
+        Commands::Titles { number, index } => {
+            let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
+            print_titles(&store.recent_titles(number), index);
+        }
         Commands::Server {
             port,
             addr,
@@ -250,9 +264,7 @@ fn read_title(recent_titles: &[String]) -> Result<String, String> {
         }
     } else {
         // choose from recent titles
-        for (i, t) in recent_titles.iter().enumerate() {
-            println!("{}: {t}", i + 1);
-        }
+        print_titles(recent_titles, true);
         print!("Choose by index (default 1): ");
         io::stdout().flush().unwrap();
         let input = read_or_panic();
@@ -265,6 +277,18 @@ fn read_title(recent_titles: &[String]) -> Result<String, String> {
                 Ok(i) => Err(format!("Invalid index: {i}.")),
                 Err(e) => Err(format!("Invalid input: {e}.")),
             }
+        }
+    }
+}
+
+fn print_titles(titles: &[String], index: bool) {
+    if index {
+        for (i, t) in titles.iter().enumerate() {
+            println!("{}: {t}", i + 1);
+        }
+    } else {
+        for t in titles.iter() {
+            println!("{t}");
         }
     }
 }
