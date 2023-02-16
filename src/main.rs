@@ -66,6 +66,8 @@ enum Commands {
         /// Title of the item to display. Choose interactively if not specified.
         title: Option<String>,
     },
+    /// Shoe latest unfinished entry
+    Ongoing,
     /// Show latest n titles
     Titles {
         /// Number of titles to show
@@ -182,6 +184,13 @@ async fn main() {
                 Err(err) => eprintln!("Error reading or choosing title: {err}."),
             }
         }
+        Commands::Ongoing => match Box::new(SqliteStore::new(&store_file)).unfinished(1).pop() {
+            Some(entry) => {
+                println!("{}", &entry.id.title);
+                println!("{} minutes ago", entry.started_minutes());
+            }
+            None => println!("No ongoing entry."),
+        },
         Commands::Titles { number, index } => {
             let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
             print_titles(&store.recent_titles(number), index);

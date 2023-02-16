@@ -20,6 +20,12 @@ pub struct UnfinishedEntry {
 }
 
 const TIME_FORMAT: &str = "%Y-%m-%d %a %H:%M";
+impl UnfinishedEntry {
+    pub fn started_minutes(&self) -> i64 {
+        (Utc::now() - self.id.start).num_minutes()
+    }
+}
+
 impl fmt::Display for UnfinishedEntry {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r = writeln!(f, "{}:", &self.id.title).and(writeln!(
