@@ -13,9 +13,11 @@ impl SqliteStore {
         let conn = if p == IN_MEMORY {
             Connection::open_in_memory().expect("Should be able to open in memory sqlite.")
         } else {
+            // TODO: logging before panic
             Connection::open(p).expect("Falied to open sqlite at specified location.")
         };
 
+        // TODO: logging before panic
         conn.execute(
             "CREATE TABLE IF NOT EXISTS clocking (
                 id INTEGER PRIMARY KEY,
@@ -148,8 +150,10 @@ impl ClockingStore for SqliteStore {
     ) -> Vec<FinishedEntry> {
         let start_string = query_start.to_rfc3339();
         let end_string = query_end.map_or_else(|| Utc::now().to_rfc3339(), |x| x.to_rfc3339());
+        // TODO: logging before panic
         let mut stmt = self.conn.prepare(
-            "SELECT title, start, end, notes from clocking where start >= ? and end is not null and end <= ? order by start ").expect("Should be able to prepare statement.");
+            "SELECT title, start, end, notes from clocking where start >= ? and end is not null and end <= ? order by start ")
+            .expect("Should be able to prepare statement.");
         stmt.query_map([&start_string, &end_string], |row| {
             Ok(SqliteStore::row_to_finished_entry(row))
         })
@@ -167,6 +171,7 @@ impl ClockingStore for SqliteStore {
     }
 
     fn recent_titles(&self, limit: usize) -> Vec<String> {
+        // TODO: logging before panic
         let mut stmt = self
             .conn
             .prepare("SELECT title, max(start) FROM clocking where end is not null group by title order by max(start) desc limit ?")
@@ -178,6 +183,7 @@ impl ClockingStore for SqliteStore {
     }
 
     fn unfinished(&self, limit: usize) -> Vec<UnfinishedEntry> {
+        // TODO: logging before panic
         let mut stmt = self
             .conn
             .prepare(
@@ -236,7 +242,7 @@ mod tests {
         assert_eq!(finished_entries.len(), 1);
 
         let finished_entry = FinishedEntry {
-            id: entry.id.clone(),
+            id: entry.id,
             end,
             notes: String::from(note),
         };

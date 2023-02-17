@@ -11,7 +11,7 @@ fi
 case $(printf "start\nfinish\nreport\nongoing\n" | dmenu -p "Action: ") in
   start)
     title=$($CCC titles -i | dmenu -p "Title: ");
-    title=${title##*: };
+    title=${title#*: };
     [[ -n "$title" ]] && $CCC start -n "$title" ;;
   finish) $CCC finish -a ;;
   report) urxvt -e sh -c "$CCC report | nvim -R" ;;

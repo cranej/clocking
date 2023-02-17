@@ -2,6 +2,7 @@ pub mod server;
 pub mod sqlite_store;
 pub mod types;
 pub mod views;
+pub mod errors;
 
 use chrono::prelude::*;
 use types::*;
@@ -21,7 +22,7 @@ pub trait ClockingStore {
         };
 
         if self.try_start_entry(&entry) {
-            Ok(entry.id.clone())
+            Ok(entry.id)
         } else {
             Err("Falied to start clocking.".to_string())
         }

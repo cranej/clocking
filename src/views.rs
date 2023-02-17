@@ -36,6 +36,7 @@ impl EntryDetailView {
             view.entry(entry.id.title.clone())
                 .and_modify(|efforts| {
                     efforts.push(
+                        // TODO: handle invalid timespan (bad data in database)
                         TimeSpan::build(
                             entry.id.start.with_timezone(&Local),
                             entry.end.with_timezone(&Local),
@@ -44,6 +45,7 @@ impl EntryDetailView {
                     );
                 })
                 .or_insert_with(|| {
+                    // TODO: handle invalid timespan (bad data in database)
                     vec![TimeSpan::build(
                         entry.id.start.with_timezone(&Local),
                         entry.end.with_timezone(&Local),
@@ -166,6 +168,7 @@ impl DailyDistributionView {
             view.entry(start_date)
                 .and_modify(|efforts| {
                     efforts.push(TimeSpanWithTitle(
+                        // TODO: handle invalid timespan (bad data in database)
                         TimeSpan::build(
                             entry.id.start.with_timezone(&Local),
                             entry.end.with_timezone(&Local),
@@ -175,6 +178,7 @@ impl DailyDistributionView {
                     ));
                 })
                 .or_insert_with(|| {
+                    // TODO: handle invalid timespan (bad data in database)
                     vec![TimeSpanWithTitle(
                         TimeSpan::build(
                             entry.id.start.with_timezone(&Local),
@@ -201,6 +205,7 @@ impl DailyDistributionView {
                 let mut with_idles_sorted: Vec<TimeSpanWithTitle> = vec![];
                 for eff in efforts.iter() {
                     if current_dt < eff.0.start().naive_local() {
+                        // TODO: handle invalid timespan (bad data in database)
                         with_idles_sorted.push(TimeSpanWithTitle(
                             TimeSpan::build(
                                 DateTime::from_local(current_dt, local_fixed_offset),
@@ -217,6 +222,7 @@ impl DailyDistributionView {
 
                 let day_end_dt = date.and_time(day_end_time);
                 if current_dt < day_end_dt {
+                    // TODO: handle invalid timespan (bad data in database)
                     with_idles_sorted.push(TimeSpanWithTitle(
                         TimeSpan::build(
                             DateTime::from_local(current_dt, local_fixed_offset),

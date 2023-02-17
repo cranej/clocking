@@ -96,6 +96,7 @@ const RECENT_TITLE_LIMIT: usize = 5;
 async fn main() {
     let cli = Cli::parse();
 
+    // TODO: logging before panic
     let store_file = cli
         .file
         .or_else(|| env::var(STORE_FILE_VAR).ok())
@@ -107,6 +108,7 @@ async fn main() {
             let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
             match title {
                 Ok(title) => {
+                    // TODO: remove expect, output error instead
                     let id = store.start(&title).expect("Failed to start clocking");
                     println!("(Started)");
                     if !no_wait {

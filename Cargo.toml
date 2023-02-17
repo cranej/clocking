@@ -10,6 +10,8 @@ authors = ["Crane Jin <crane@cranejin.com>"]
 [dependencies]
 chrono = { version = "0.4.23", features = ["std", "clock", "serde"] }
 clap = { version = "4.1.1", features = ["derive", "cargo"] }
+env_logger = "0.10.0"
+log = "0.4.17"
 pulldown-cmark = "0.9.2"
 rocket = { version = "0.5.0-rc.2", features = ["json"] }
 rusqlite = { version = "0.28.0", features = ["bundled"] }

@@ -9,7 +9,6 @@ use rocket::{
     State,
 };
 use rust_embed::RustEmbed;
-use std::ffi::OsStr;
 use std::path::PathBuf;
 
 #[derive(RustEmbed)]
@@ -45,8 +44,8 @@ pub fn api_unfinished(config: &State<ServerConfig>) -> Json<Vec<EntryId>> {
     let r: Vec<EntryId> = config
         .new_store()
         .unfinished(10)
-        .iter()
-        .map(|x| x.id.clone())
+        .into_iter()
+        .map(|x| x.id)
         .collect();
     Json(r)
 }
@@ -128,6 +127,7 @@ pub fn api_report_by_date(
 
 #[get("/")]
 pub fn index() -> (ContentType, String) {
+    // TODO: get rid of unwrap
     let page = Asset::get("index.html").unwrap();
     (
         ContentType::HTML,
@@ -137,6 +137,7 @@ pub fn index() -> (ContentType, String) {
 
 #[get("/favicon.png")]
 pub fn favicon() -> (ContentType, Vec<u8>) {
+    // TODO: get rid of unwrap
     let page = Asset::get("favicon.png").unwrap();
     (ContentType::PNG, page.data.into_owned())
 }
@@ -145,13 +146,13 @@ pub fn favicon() -> (ContentType, Vec<u8>) {
 pub fn anyfile(file: PathBuf) -> (ContentType, String) {
     let content_type = match file.as_path().extension() {
         Some(o) => {
-            if o == OsStr::new("html") {
+            if o == "html" {
                 ContentType::HTML
-            } else if o == OsStr::new("js") {
+            } else if o == "js" {
                 ContentType::JavaScript
-            } else if o == OsStr::new("css") {
+            } else if o == "css" {
                 ContentType::CSS
-            } else if o == OsStr::new("png") {
+            } else if o == "png" {
                 ContentType::PNG
             } else {
                 ContentType::Binary
@@ -159,6 +160,7 @@ pub fn anyfile(file: PathBuf) -> (ContentType, String) {
         }
         None => ContentType::Binary,
     };
+    // TODO: get rid of unwrap
     let page = Asset::get(file.to_str().unwrap()).unwrap();
     (
         content_type,
