@@ -33,7 +33,7 @@ impl EntryDetailView {
     pub fn new(entries: &[FinishedEntry]) -> Self {
         let mut view: Map<String, Vec<TimeSpan>> = Map::new();
         for entry in entries.iter() {
-            view.entry(entry.id.title.clone())
+            view.entry(entry.id.title.to_string())
                 .and_modify(|efforts| {
                     efforts.push(
                         // TODO: handle invalid timespan (bad data in database)
@@ -105,13 +105,13 @@ impl DailyDetailView {
             view.entry(start)
                 .and_modify(|inner_map| {
                     inner_map
-                        .entry(entry.id.title.clone())
+                        .entry(entry.id.title.to_string())
                         .and_modify(|dur| *dur = *dur + duration)
                         .or_insert(duration);
                 })
                 .or_insert_with(|| {
                     let mut inner_map: TitleDurationMap = TitleDurationMap::new();
-                    inner_map.insert(entry.id.title.clone(), duration);
+                    inner_map.insert(entry.id.title.to_string(), duration);
                     inner_map
                 });
         }
@@ -174,7 +174,7 @@ impl DailyDistributionView {
                             entry.end.with_timezone(&Local),
                         )
                         .unwrap(),
-                        entry.id.title.clone(),
+                        entry.id.title.to_string(),
                     ));
                 })
                 .or_insert_with(|| {
@@ -185,7 +185,7 @@ impl DailyDistributionView {
                             entry.end.with_timezone(&Local),
                         )
                         .unwrap(),
-                        entry.id.title.clone(),
+                        entry.id.title.to_string(),
                     )]
                 });
         }
@@ -246,17 +246,14 @@ impl fmt::Display for DailyDistributionView {
         let mut r: fmt::Result = Ok(());
         for (date, efforts) in self.0.iter() {
             r = r.and_then(|_| writeln!(f, "{date}: "));
-            if f.alternate() {
-                for eff in efforts.iter() {
-                    r = r.and_then(|_| writeln!(f, "\t{:#}: {}", eff.0, eff.1));
-                }
+            let filter_func: &dyn Fn(&&TimeSpanWithTitle) -> bool = if f.alternate() {
+                &|_eff| true
             } else {
-                for eff in efforts
-                    .iter()
-                    .filter(|eff| eff.0.duration().num_minutes() > 0)
-                {
-                    r = r.and_then(|_| writeln!(f, "\t{:#}: {}", eff.0, eff.1));
-                }
+                &|eff| eff.0.duration().num_minutes() > 0
+            };
+
+            for eff in efforts.iter().filter(filter_func) {
+                r = r.and_then(|_| writeln!(f, "\t{:#}: {}", eff.0, eff.1));
             }
         }
         r

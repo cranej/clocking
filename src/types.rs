@@ -4,29 +4,30 @@ use pulldown_cmark::{html, Parser};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::fmt;
+use std::borrow::Cow;
 
 /// Identify an unique clocking entity
 #[derive(Serialize, PartialEq, Clone, Debug)]
-pub struct EntryId {
-    pub title: String,
+pub struct EntryId<'a> {
+    pub title: Cow<'a, str>,
     pub start: DateTime<Utc>,
 }
 
 /// Represent an unfinished clocking entity.
 #[derive(Serialize, PartialEq, Clone, Debug)]
-pub struct UnfinishedEntry {
-    pub id: EntryId,
-    pub notes: String,
+pub struct UnfinishedEntry<'a> {
+    pub id: EntryId<'a>,
+    pub notes: Cow<'a, str>,
 }
 
 const TIME_FORMAT: &str = "%Y-%m-%d %a %H:%M";
-impl UnfinishedEntry {
+impl<'a> UnfinishedEntry<'a>{
     pub fn started_minutes(&self) -> i64 {
         (Utc::now() - self.id.start).num_minutes()
     }
 }
 
-impl fmt::Display for UnfinishedEntry {
+impl<'a> fmt::Display for UnfinishedEntry<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r = writeln!(f, "{}:", &self.id.title).and(writeln!(
             f,
@@ -47,13 +48,13 @@ impl fmt::Display for UnfinishedEntry {
 
 /// Represent a finished clocking entry.
 #[derive(Serialize, PartialEq, Clone, Debug)]
-pub struct FinishedEntry {
-    pub id: EntryId,
+pub struct FinishedEntry<'a> {
+    pub id: EntryId<'a>,
     pub end: DateTime<Utc>,
-    pub notes: String,
+    pub notes: Cow<'a, str>,
 }
 
-impl FinishedEntry {
+impl<'a> FinishedEntry<'a> {
     pub fn html_segment(&self) -> String {
         let text = format!(
             "## {}\n **{}** ~ **{}** \n\n {}",
@@ -71,7 +72,7 @@ impl FinishedEntry {
     }
 }
 
-impl fmt::Display for FinishedEntry {
+impl<'a> fmt::Display for FinishedEntry<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut r = writeln!(f, "{}:", &self.id.title).and(writeln!(
             f,

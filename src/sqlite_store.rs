@@ -2,6 +2,7 @@ use crate::types::*;
 use crate::{ClockingStore, Result};
 use chrono::prelude::*;
 use rusqlite::Connection;
+use std::borrow::Cow;
 
 pub struct SqliteStore {
     conn: Connection,
@@ -33,12 +34,12 @@ impl SqliteStore {
         SqliteStore { conn }
     }
 
-    fn row_to_finished_entry(row: &rusqlite::Row<'_>) -> FinishedEntry {
+    fn row_to_finished_entry<'a>(row: &'_ rusqlite::Row<'_>) -> FinishedEntry<'a> {
         let start_string: String = row.get("start").unwrap();
         let end_string: String = row.get("end").unwrap();
         FinishedEntry {
             id: EntryId {
-                title: row.get("title").unwrap(),
+                title: Cow::Owned(row.get("title").unwrap()),
                 start: DateTime::parse_from_rfc3339(&start_string)
                     .unwrap()
                     .with_timezone(&Utc),
@@ -46,20 +47,20 @@ impl SqliteStore {
             end: DateTime::parse_from_rfc3339(&end_string)
                 .unwrap()
                 .with_timezone(&Utc),
-            notes: row.get("notes").unwrap_or_else(|_| String::new()),
+            notes: row.get("notes").map(Cow::Owned).unwrap_or_else(|_| Cow::Borrowed("")),
         }
     }
 
-    fn row_to_unfinished_entry(row: &rusqlite::Row<'_>) -> UnfinishedEntry {
+    fn row_to_unfinished_entry<'a>(row: &'_ rusqlite::Row<'_>) -> UnfinishedEntry<'a> {
         let start_string: String = row.get("start").unwrap();
         UnfinishedEntry {
             id: EntryId {
-                title: row.get("title").unwrap(),
+                title: Cow::Owned(row.get("title").unwrap()),
                 start: DateTime::parse_from_rfc3339(&start_string)
                     .unwrap()
                     .with_timezone(&Utc),
             },
-            notes: row.get("notes").unwrap_or_else(|_| String::new()),
+            notes: row.get("notes").map(Cow::Owned).unwrap_or_else(|_| Cow::Borrowed("")),
         }
     }
 }
@@ -69,7 +70,7 @@ impl ClockingStore for SqliteStore {
         let start_time_string = entry.id.start.to_rfc3339();
         match self.conn.query_row(
             "SELECT id FROM clocking WHERE title = ? and start = ?",
-            [&entry.id.title, &start_time_string],
+            [entry.id.title.as_ref(), &start_time_string],
             |_row| Ok(()),
         ) {
             Ok(()) => {
@@ -79,7 +80,7 @@ impl ClockingStore for SqliteStore {
             Err(rusqlite::Error::QueryReturnedNoRows) => {
                 match self.conn.execute(
                     "INSERT INTO clocking (title, start, notes) VALUES(?, ?, ?)",
-                    [&entry.id.title, &start_time_string, &entry.notes],
+                    [entry.id.title.as_ref(), &start_time_string, entry.notes.as_ref()],
                 ) {
                     Ok(1) => true,
                     Ok(inserted) => {
@@ -143,11 +144,11 @@ impl ClockingStore for SqliteStore {
         }
     }
 
-    fn finished(
+    fn finished<'a>(
         &self,
         query_start: &DateTime<Utc>,
         query_end: Option<DateTime<Utc>>,
-    ) -> Vec<FinishedEntry> {
+    ) -> Vec<FinishedEntry<'a>> {
         let start_string = query_start.to_rfc3339();
         let end_string = query_end.map_or_else(|| Utc::now().to_rfc3339(), |x| x.to_rfc3339());
         // TODO: logging before panic
@@ -182,7 +183,7 @@ impl ClockingStore for SqliteStore {
             .collect()
     }
 
-    fn unfinished(&self, limit: usize) -> Vec<UnfinishedEntry> {
+    fn unfinished<'a>(&self, limit: usize) -> Vec<UnfinishedEntry<'a>> {
         // TODO: logging before panic
         let mut stmt = self
             .conn
@@ -207,10 +208,10 @@ mod tests {
         let start_time = Utc::now();
         let entry = UnfinishedEntry {
             id: EntryId {
-                title: "The Program".to_string(),
+                title: "The Program".into(),
                 start: start_time,
             },
-            notes: String::new(),
+            notes: "".into(),
         };
 
         assert_eq!(mem_store.try_start_entry(&entry), true);
@@ -244,7 +245,7 @@ mod tests {
         let finished_entry = FinishedEntry {
             id: entry.id,
             end,
-            notes: String::from(note),
+            notes: note.into(),
         };
 
         assert_eq!(&finished_entries[0], &finished_entry);
@@ -297,16 +298,16 @@ mod tests {
         let mut mem_store = SqliteStore::new(IN_MEMORY);
         let mut entries = gen_entries(6);
         assert_eq!(entries.len(), 6);
-        entries[2].id.title = "Item 0".to_string();
-        entries[3].id.title = "Item 1".to_string();
-        entries[4].id.title = "Item 0".to_string();
-        entries[5].id.title = "Item 1".to_string();
-        // now there are there Item 0 and there Item 1 in collection
+        entries[2].id.title = "Item 0".into();
+        entries[3].id.title = "Item 1".into();
+        entries[4].id.title = "Item 0".into();
+        entries[5].id.title = "Item 1".into();
+        // now there are three Item 0 and three Item 1 in collection
         for entry in entries.iter() {
             assert!(mem_store.try_start_entry(entry));
         }
 
-        //finish the fouth 1 , which is a "Item 1"
+        //finish the fourth 1 , which is a "Item 1"
         assert_eq!(&entries[3].id.title, "Item 1");
         assert!(mem_store.try_finish_entry_now(&entries[3].id, ""));
 
@@ -331,26 +332,26 @@ mod tests {
         assert_eq!(Ok(false), mem_store.try_finish_title("non-exists", ""));
     }
 
-    fn gen_entries(count: usize) -> Vec<UnfinishedEntry> {
+    fn gen_entries(count: usize) -> Vec<UnfinishedEntry<'static>> {
         let five_mins = chrono::Duration::minutes(5);
         (0..count)
             .map(|i| {
                 let start_offset = chrono::Duration::days((count - i - 1) as i64) + five_mins;
                 UnfinishedEntry {
                     id: EntryId {
-                        title: format!("Item {i}"),
+                        title: format!("Item {i}").into(),
                         start: Utc::now().checked_sub_signed(start_offset).unwrap(),
                     },
-                    notes: format!("Init notes for item {i}\n"),
+                    notes: format!("Init notes for item {i}\n").into(),
                 }
             })
             .collect()
     }
 
     fn gen_end_data<'a>(
-        source: &'a [UnfinishedEntry],
+        source: &'a [UnfinishedEntry<'a>],
         indices: &[usize],
-    ) -> Vec<(&'a UnfinishedEntry, DateTime<Utc>)> {
+    ) -> Vec<(&'a UnfinishedEntry<'a>, DateTime<Utc>)> {
         let five_mins = chrono::Duration::minutes(5);
         indices
             .iter()
@@ -362,8 +363,8 @@ mod tests {
             .collect()
     }
 
-    fn gen_finished_entry(item: &UnfinishedEntry, new_note: &str) -> FinishedEntry {
-        let mut final_notes = item.notes.clone();
+    fn gen_finished_entry<'a>(item: &'a UnfinishedEntry<'a>, new_note: &str) -> FinishedEntry<'a> {
+        let mut final_notes = item.notes.to_string();
         final_notes.push_str(new_note);
         FinishedEntry {
             id: item.id.clone(),
@@ -372,7 +373,7 @@ mod tests {
                 .start
                 .checked_add_signed(chrono::Duration::minutes(5))
                 .unwrap(),
-            notes: final_notes,
+            notes: final_notes.into(),
         }
     }
 }

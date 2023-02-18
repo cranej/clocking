@@ -6,19 +6,20 @@ pub mod errors;
 
 use chrono::prelude::*;
 use types::*;
+use std::borrow::Cow;
 
 type Result<T> = std::result::Result<T, String>;
 
 const NAIVE_DATE_FORMAT: &str = "%Y-%m-%d";
 pub trait ClockingStore {
     /// Start a clocking entry at now.
-    fn start(&mut self, title: &str) -> Result<EntryId> {
+    fn start<'a, 'b>(&'a mut self, title: &'b str) -> Result<EntryId<'b>> {
         let entry = UnfinishedEntry {
             id: EntryId {
-                title: title.to_string(),
+                title: Cow::Borrowed(title),
                 start: Utc::now(),
             },
-            notes: String::new(),
+            notes: "".into(),
         };
 
         if self.try_start_entry(&entry) {
@@ -59,16 +60,16 @@ pub trait ClockingStore {
     /// Query finished clocking entries with start in `[query_start, query_end]`.
     ///
     /// `query_end` default to now if None specified.
-    fn finished(
+    fn finished<'a>(
         &self,
         query_start: &DateTime<Utc>,
         query_end: Option<DateTime<Utc>>,
-    ) -> Vec<FinishedEntry>;
+    ) -> Vec<FinishedEntry<'a>>;
 
     /// Query finished clocking entries from date range:
     ///   start: (@today - `days_offset`) 0:00:00
     ///   to: (@today - `days_offset` + days) 0:00:00 if days is not None, otherwise to now()
-    fn finished_by_offset(&self, days_offset: u64, days: Option<u64>) -> Vec<FinishedEntry> {
+    fn finished_by_offset<'a>(&self, days_offset: u64, days: Option<u64>) -> Vec<FinishedEntry<'a>> {
         let (start, end) = store_helper::query_start_end(days_offset, days);
         self.finished(&start, end)
     }
@@ -113,7 +114,7 @@ pub trait ClockingStore {
     fn recent_titles(&self, limit: usize) -> Vec<String>;
 
     /// Fetch at most `limit` latest-started unfinished clocking entries.
-    fn unfinished(&self, limit: usize) -> Vec<UnfinishedEntry>;
+    fn unfinished<'a>(&self, limit: usize) -> Vec<UnfinishedEntry<'a>>;
 }
 
 pub(crate) mod store_helper {
