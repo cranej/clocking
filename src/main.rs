@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand};
-use clocking::sqlite_store::SqliteStore;
-use clocking::ClockingStore;
+use clocking::{errors, new_sqlite_store, ClockingStore};
 use std::env;
 use std::io::{self, Write};
 
@@ -93,10 +92,9 @@ enum Commands {
 const STORE_FILE_VAR: &str = "CLOCKING_FILE";
 const RECENT_TITLE_LIMIT: usize = 5;
 #[rocket::main]
-async fn main() {
+async fn main() -> Result<(), errors::Error> {
     let cli = Cli::parse();
 
-    // TODO: logging before panic
     let store_file = cli
         .file
         .or_else(|| env::var(STORE_FILE_VAR).ok())
@@ -104,18 +102,21 @@ async fn main() {
 
     match cli.command {
         Commands::Start { title, no_wait } => {
-            let mut store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-            let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
+            let mut store = new_sqlite_store(&store_file);
+            let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT)?);
             match title {
                 Ok(title) => {
-                    // TODO: remove expect, output error instead
-                    let id = store.start(&title).expect("Failed to start clocking");
+                    let id = store.start(&title)?;
                     println!("(Started)");
                     if !no_wait {
                         println!("(Ctrl-D to finish clocking)");
                         let notes = read_to_end();
-                        store.try_finish_entry_now(&id, &notes);
-                        println!("(Finished)");
+                        if store.try_finish_entry_now(&id, &notes)? {
+                            println!("(Finished)");
+                        } else {
+                            return Err(errors::Error::ImpossibleState(
+                                    "We should be able to finish it, but somehow it's already finished...".to_string()));
+                        }
                     };
                 }
                 Err(e) => {
@@ -124,15 +125,14 @@ async fn main() {
             };
         }
         Commands::Finish { title, any, notes } => {
-            let mut store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-
+            let mut store = new_sqlite_store(&store_file);
             let notes = if notes.len() == 1 && notes[0] == "-" {
                 read_to_end()
             } else {
                 notes.join("\n")
             };
             if !any {
-                let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
+                let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT)?);
                 match title {
                     Ok(title) => match store.try_finish_title(&title, &notes) {
                         Ok(true) => println!("(Updated)"),
@@ -157,8 +157,8 @@ async fn main() {
             daily_dist,
             ..
         } => {
-            let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-            let entries = store.finished_by_offset(from.unwrap_or(0), days);
+            let store = new_sqlite_store(&store_file);
+            let entries = store.finished_by_offset(from.unwrap_or(0), days)?;
 
             if daily_summary {
                 let view = clocking::views::DailySummaryView::new(&entries);
@@ -175,18 +175,18 @@ async fn main() {
             }
         }
         Commands::Latest { title } => {
-            let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
+            let store = new_sqlite_store(&store_file);
 
-            let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT));
+            let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT)?);
             match title {
-                Ok(title) => match store.latest_finished(&title) {
+                Ok(title) => match store.latest_finished(&title)? {
                     Some(item) => println!("{item}"),
                     None => println!("(Not found)"),
                 },
                 Err(err) => eprintln!("Error reading or choosing title: {err}."),
             }
         }
-        Commands::Ongoing => match Box::new(SqliteStore::new(&store_file)).unfinished(1).pop() {
+        Commands::Ongoing => match new_sqlite_store(&store_file).unfinished(1)?.pop() {
             Some(entry) => {
                 println!("{}", &entry.id.title);
                 println!("{} minutes ago", entry.started_minutes());
@@ -194,8 +194,8 @@ async fn main() {
             None => println!("No ongoing entry."),
         },
         Commands::Titles { number, index } => {
-            let store: Box<dyn ClockingStore> = Box::new(SqliteStore::new(&store_file));
-            print_titles(&store.recent_titles(number), index);
+            let store = new_sqlite_store(&store_file);
+            print_titles(&store.recent_titles(number)?, index);
         }
         Commands::Server {
             port,
@@ -212,6 +212,8 @@ async fn main() {
             let server_config = clocking::server::ServerConfig {
                 db_file: store_file.clone(),
             };
+
+            // TODO: move rocket initialization into lib, make handler private
             let rocket = rocket::custom(&config)
                 .manage(server_config)
                 .mount(
@@ -245,6 +247,8 @@ async fn main() {
             let _ = rocket.ignite().await.unwrap().launch().await;
         }
     }
+
+    Ok(())
 }
 
 fn handle_title(title: Option<String>, recent_titles: &[String]) -> Result<String, String> {

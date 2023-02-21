@@ -1,14 +1,19 @@
+pub mod errors;
 pub mod server;
-pub mod sqlite_store;
+mod sqlite_store;
 pub mod types;
 pub mod views;
-pub mod errors;
 
 use chrono::prelude::*;
-use types::*;
+use sqlite_store::SqliteStore;
 use std::borrow::Cow;
+use types::*;
 
-type Result<T> = std::result::Result<T, String>;
+type Result<T> = std::result::Result<T, errors::Error>;
+
+pub fn new_sqlite_store(path: &str) -> impl ClockingStore {
+    SqliteStore::new(path)
+}
 
 const NAIVE_DATE_FORMAT: &str = "%Y-%m-%d";
 pub trait ClockingStore {
@@ -22,17 +27,12 @@ pub trait ClockingStore {
             notes: "".into(),
         };
 
-        if self.try_start_entry(&entry) {
-            Ok(entry.id)
-        } else {
-            Err("Falied to start clocking.".to_string())
-        }
+        self.start_entry(&entry)?;
+        Ok(entry.id)
     }
 
     /// Start a clocking entry.
-    ///
-    /// Return false if entry already started.
-    fn try_start_entry(&mut self, entry: &UnfinishedEntry) -> bool;
+    fn start_entry(&mut self, entry: &UnfinishedEntry) -> Result<()>;
 
     /// Try to finish the latest-started unfinished entry of given title.
     ///
@@ -47,7 +47,7 @@ pub trait ClockingStore {
     /// Try to finish an unfinished clocking entry, set end datetime to now.
     ///
     /// Returns false if give entry is already finished or not found.
-    fn try_finish_entry_now(&mut self, id: &EntryId, notes: &str) -> bool {
+    fn try_finish_entry_now(&mut self, id: &EntryId, notes: &str) -> Result<bool> {
         let end = Utc::now();
         self.try_finish_entry(id, &end, notes)
     }
@@ -55,21 +55,25 @@ pub trait ClockingStore {
     /// Try to finish an unfinished clocking entry, set end datetime to `end`.
     ///
     /// Returns false if give entry is already finished or not found.
-    fn try_finish_entry(&mut self, id: &EntryId, end: &DateTime<Utc>, notes: &str) -> bool;
+    fn try_finish_entry(&mut self, id: &EntryId, end: &DateTime<Utc>, notes: &str) -> Result<bool>;
 
     /// Query finished clocking entries with start in `[query_start, query_end]`.
     ///
-    /// `query_end` default to now if None specified.
+    /// `query_end` default to now if None is specified.
     fn finished<'a>(
         &self,
         query_start: &DateTime<Utc>,
         query_end: Option<DateTime<Utc>>,
-    ) -> Vec<FinishedEntry<'a>>;
+    ) -> Result<Vec<FinishedEntry<'a>>>;
 
     /// Query finished clocking entries from date range:
     ///   start: (@today - `days_offset`) 0:00:00
     ///   to: (@today - `days_offset` + days) 0:00:00 if days is not None, otherwise to now()
-    fn finished_by_offset<'a>(&self, days_offset: u64, days: Option<u64>) -> Vec<FinishedEntry<'a>> {
+    fn finished_by_offset<'a>(
+        &self,
+        days_offset: u64,
+        days: Option<u64>,
+    ) -> Result<Vec<FinishedEntry<'a>>> {
         let (start, end) = store_helper::query_start_end(days_offset, days);
         self.finished(&start, end)
     }
@@ -77,18 +81,16 @@ pub trait ClockingStore {
     /// Query finished clocking entries, accepts 'yyyy-mm-dd' local dates as query range.
     ///
     /// Note: `day_end` is included in the query range.
-    fn finished_by_date_str(
-        &self,
-        day_start: &str,
-        day_end: &str,
-    ) -> std::result::Result<Vec<FinishedEntry>, &'static str> {
+    fn finished_by_date_str(&self, day_start: &str, day_end: &str) -> Result<Vec<FinishedEntry>> {
         let start_date = NaiveDate::parse_from_str(day_start, NAIVE_DATE_FORMAT)
-            .map_err(|_| "Invalid format of day_start")?;
+            .map_err(|_| errors::Error::InvalidInput("Invalid format of day_start".to_string()))?;
         let end_date = NaiveDate::parse_from_str(day_end, NAIVE_DATE_FORMAT)
-            .map_err(|_| "Invalid format of day_end")?;
+            .map_err(|_| errors::Error::InvalidInput("Invalid format of day_end".to_string()))?;
 
         if end_date < start_date {
-            Err("Invalid date range: day_end must not before day_start")
+            Err(errors::Error::InvalidInput(
+                "Invalid date range: day_end must not before day_start".to_string(),
+            ))
         } else {
             let today_naive = Local::now().date_naive();
             let local_fixed_offset = Local.offset_from_local_date(&today_naive).unwrap();
@@ -103,18 +105,18 @@ pub trait ClockingStore {
             )
             .with_timezone(&Utc);
 
-            Ok(self.finished(&start_dt, Some(end_dt)))
+            self.finished(&start_dt, Some(end_dt))
         }
     }
 
-    /// Fetch latest-started finished clocking entries by title.
-    fn latest_finished(&self, title: &str) -> Option<FinishedEntry>;
+    /// Fetch latest-started finished clocking entry by title.
+    fn latest_finished(&self, title: &str) -> Result<Option<FinishedEntry>>;
 
     /// Fetch at most `limit` latest-started finished clocking entries.
-    fn recent_titles(&self, limit: usize) -> Vec<String>;
+    fn recent_titles(&self, limit: usize) -> Result<Vec<String>>;
 
     /// Fetch at most `limit` latest-started unfinished clocking entries.
-    fn unfinished<'a>(&self, limit: usize) -> Vec<UnfinishedEntry<'a>>;
+    fn unfinished<'a>(&self, limit: usize) -> Result<Vec<UnfinishedEntry<'a>>>;
 }
 
 pub(crate) mod store_helper {

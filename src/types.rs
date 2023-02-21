@@ -2,9 +2,9 @@ use crate::strify_duration;
 use chrono::prelude::*;
 use pulldown_cmark::{html, Parser};
 use serde::Serialize;
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
-use std::borrow::Cow;
 
 /// Identify an unique clocking entity
 #[derive(Serialize, PartialEq, Clone, Debug)]
@@ -21,7 +21,7 @@ pub struct UnfinishedEntry<'a> {
 }
 
 const TIME_FORMAT: &str = "%Y-%m-%d %a %H:%M";
-impl<'a> UnfinishedEntry<'a>{
+impl<'a> UnfinishedEntry<'a> {
     pub fn started_minutes(&self) -> i64 {
         (Utc::now() - self.id.start).num_minutes()
     }

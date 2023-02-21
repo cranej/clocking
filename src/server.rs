@@ -1,6 +1,5 @@
 //! Rocket request handlers.
-use crate::sqlite_store::SqliteStore;
-use crate::{types::EntryId, views, ClockingStore};
+use crate::{new_sqlite_store, types::EntryId, views, ClockingStore};
 use rocket::{
     get,
     http::{ContentType, Status},
@@ -21,29 +20,34 @@ pub struct ServerConfig {
 
 impl ServerConfig {
     fn new_store(&self) -> Box<dyn ClockingStore> {
-        Box::new(SqliteStore::new(&self.db_file))
+        Box::new(new_sqlite_store(&self.db_file))
     }
 }
 
 #[get("/recent")]
 pub fn api_recent(config: &State<ServerConfig>) -> Json<Vec<String>> {
-    Json(config.new_store().recent_titles(5))
+    // TODO: remove unwrap
+    Json(config.new_store().recent_titles(5).unwrap())
 }
 
 #[get("/latest/<title>")]
 pub fn api_latest(title: &str, config: &State<ServerConfig>) -> String {
+    // TODO: remove unwrap
     config
         .new_store()
         .latest_finished(title)
+        .unwrap()
         .map(|entity| entity.html_segment())
         .unwrap_or_else(String::new)
 }
 
 #[get("/unfinished")]
 pub fn api_unfinished(config: &State<ServerConfig>) -> Json<Vec<EntryId>> {
+    // TODO: remove unwrap
     let r: Vec<EntryId> = config
         .new_store()
         .unfinished(10)
+        .unwrap()
         .into_iter()
         .map(|x| x.id)
         .collect();
@@ -78,7 +82,8 @@ pub fn api_report(
     view_type: &str,
     config: &State<ServerConfig>,
 ) -> String {
-    let entries = config.new_store().finished_by_offset(offset, days);
+    // TODO: remove unwrap
+    let entries = config.new_store().finished_by_offset(offset, days).unwrap();
     if view_type == "daily" {
         let view = views::DailySummaryView::new(&entries);
         view.to_string()

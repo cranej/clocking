@@ -1,16 +1,18 @@
+use crate::errors::Error;
 use crate::types::*;
 use crate::{ClockingStore, Result};
 use chrono::prelude::*;
 use rusqlite::Connection;
+use rusqlite::OptionalExtension;
 use std::borrow::Cow;
 
-pub struct SqliteStore {
+pub(crate) struct SqliteStore {
     conn: Connection,
 }
 
-pub const IN_MEMORY: &str = ":memory:";
+const IN_MEMORY: &str = ":memory:";
 impl SqliteStore {
-    pub fn new(p: &str) -> Self {
+    pub(crate) fn new(p: &str) -> Self {
         let conn = if p == IN_MEMORY {
             Connection::open_in_memory().expect("Should be able to open in memory sqlite.")
         } else {
@@ -47,7 +49,10 @@ impl SqliteStore {
             end: DateTime::parse_from_rfc3339(&end_string)
                 .unwrap()
                 .with_timezone(&Utc),
-            notes: row.get("notes").map(Cow::Owned).unwrap_or_else(|_| Cow::Borrowed("")),
+            notes: row
+                .get("notes")
+                .map(Cow::Owned)
+                .unwrap_or_else(|_| Cow::Borrowed("")),
         }
     }
 
@@ -60,43 +65,41 @@ impl SqliteStore {
                     .unwrap()
                     .with_timezone(&Utc),
             },
-            notes: row.get("notes").map(Cow::Owned).unwrap_or_else(|_| Cow::Borrowed("")),
+            notes: row
+                .get("notes")
+                .map(Cow::Owned)
+                .unwrap_or_else(|_| Cow::Borrowed("")),
         }
     }
 }
 
 impl ClockingStore for SqliteStore {
-    fn try_start_entry(&mut self, entry: &UnfinishedEntry) -> bool {
+    fn start_entry(&mut self, entry: &UnfinishedEntry) -> Result<()> {
         let start_time_string = entry.id.start.to_rfc3339();
         match self.conn.query_row(
             "SELECT id FROM clocking WHERE title = ? and start = ?",
             [entry.id.title.as_ref(), &start_time_string],
             |_row| Ok(()),
         ) {
-            Ok(()) => {
-                println!("Existed...");
-                false
-            }
+            Ok(()) => Err(Error::DuplicateEntry),
             Err(rusqlite::Error::QueryReturnedNoRows) => {
                 match self.conn.execute(
                     "INSERT INTO clocking (title, start, notes) VALUES(?, ?, ?)",
-                    [entry.id.title.as_ref(), &start_time_string, entry.notes.as_ref()],
+                    [
+                        entry.id.title.as_ref(),
+                        &start_time_string,
+                        entry.notes.as_ref(),
+                    ],
                 ) {
-                    Ok(1) => true,
-                    Ok(inserted) => {
-                        println!("abnormal inserted count: {}", inserted);
-                        false
-                    }
-                    Err(err) => {
-                        println!("Insert failed: {}", err);
-                        false
-                    }
+                    Ok(1) => Ok(()),
+                    Ok(inserted) => Err(Error::ImpossibleState(format!(
+                        "abnormal inserted count: {}",
+                        inserted
+                    ))),
+                    Err(err) => Err(err.into()),
                 }
             }
-            Err(other_err) => {
-                println!("Error when query existing item: {}", other_err);
-                false
-            }
+            Err(other_err) => Err(other_err.into()),
         }
     }
 
@@ -109,11 +112,13 @@ impl ClockingStore for SqliteStore {
             )",
                 [&end_string, notes, title],
             )
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.into())
             .and_then(|n| match n {
                 0 => Ok(false),
                 1 => Ok(true),
-                _ => Err(format!("{n} rows updated! should be 1...")),
+                _ => Err(Error::ImpossibleState(format!(
+                    "{n} rows updated! should be 1..."
+                ))),
             })
     }
 
@@ -129,18 +134,19 @@ impl ClockingStore for SqliteStore {
             )
             .or_else(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => Ok(None),
-                other => Err(format!("Unexpected error: {other}")),
+                other => Err(other.into()),
             })
     }
 
-    fn try_finish_entry(&mut self, id: &EntryId, end: &DateTime<Utc>, notes: &str) -> bool {
+    fn try_finish_entry(&mut self, id: &EntryId, end: &DateTime<Utc>, notes: &str) -> Result<bool> {
         let start_string = id.start.to_rfc3339();
         let end_string = end.to_rfc3339();
         match self.conn.execute("UPDATE clocking SET end = ?, notes = IFNULL(notes, '')||?  WHERE title = ? and start = ? and end IS NULL and start < ?",
                            [&end_string, notes, &id.title, &start_string, &end_string]) {
-            Ok(1) => true,
-            Ok(updated) => { println!("abnormal updated count: {}", updated); false },
-            Err(err) => { println!("Update failed: {}", err); false },
+            Ok(1) => Ok(true),
+            Ok(0) => Ok(false),
+            Ok(updated) => Err(Error::ImpossibleState(format!("abnormal updated count: {}", updated))),
+            Err(err) => Err(err.into()),
         }
     }
 
@@ -148,53 +154,43 @@ impl ClockingStore for SqliteStore {
         &self,
         query_start: &DateTime<Utc>,
         query_end: Option<DateTime<Utc>>,
-    ) -> Vec<FinishedEntry<'a>> {
+    ) -> Result<Vec<FinishedEntry<'a>>> {
         let start_string = query_start.to_rfc3339();
         let end_string = query_end.map_or_else(|| Utc::now().to_rfc3339(), |x| x.to_rfc3339());
-        // TODO: logging before panic
         let mut stmt = self.conn.prepare(
-            "SELECT title, start, end, notes from clocking where start >= ? and end is not null and end <= ? order by start ")
-            .expect("Should be able to prepare statement.");
-        stmt.query_map([&start_string, &end_string], |row| {
+            "SELECT title, start, end, notes from clocking where start >= ? and end is not null and end <= ? order by start ")?;
+        let r = stmt.query_map([&start_string, &end_string], |row| {
             Ok(SqliteStore::row_to_finished_entry(row))
-        })
-        .unwrap()
-        .map(|x| x.unwrap())
-        .collect()
+        })?;
+        Ok(r.map(|x| x.unwrap()).collect())
     }
 
-    fn latest_finished(&self, title: &str) -> Option<FinishedEntry> {
+    fn latest_finished(&self, title: &str) -> Result<Option<FinishedEntry>> {
         self.conn.query_row(
             "SELECT title, start, end, notes from clocking where title = ? and end is not null order by start desc limit 1",
             [title],
             |row| Ok(SqliteStore::row_to_finished_entry(row)))
-            .ok()
+            .optional()
+            .map_err(|e| e.into())
     }
 
-    fn recent_titles(&self, limit: usize) -> Vec<String> {
-        // TODO: logging before panic
+    fn recent_titles(&self, limit: usize) -> Result<Vec<String>> {
         let mut stmt = self
             .conn
-            .prepare("SELECT title, max(start) FROM clocking where end is not null group by title order by max(start) desc limit ?")
-            .expect("Should be able to prepare statment.");
-        stmt.query_map([limit], |row| Ok(row.get("title").unwrap()))
-            .unwrap()
-            .map(|x| x.unwrap())
-            .collect()
+            .prepare("SELECT title, max(start) FROM clocking where end is not null group by title order by max(start) desc limit ?")?;
+        let r = stmt.query_map([limit], |row| Ok(row.get("title").unwrap()))?;
+
+        Ok(r.map(|x| x.unwrap()).collect())
     }
 
-    fn unfinished<'a>(&self, limit: usize) -> Vec<UnfinishedEntry<'a>> {
-        // TODO: logging before panic
+    fn unfinished<'a>(&self, limit: usize) -> Result<Vec<UnfinishedEntry<'a>>> {
         let mut stmt = self
             .conn
             .prepare(
                 "select title, start, notes from clocking where end is null order by start desc limit ?",
-            )
-            .expect("Should be able to prepare statment.");
-        stmt.query_map([limit], |row| Ok(SqliteStore::row_to_unfinished_entry(row)))
-            .unwrap()
-            .map(|x| x.unwrap())
-            .collect()
+            )?;
+        let r = stmt.query_map([limit], |row| Ok(SqliteStore::row_to_unfinished_entry(row)))?;
+        Ok(r.map(|x| x.unwrap()).collect())
     }
 }
 
