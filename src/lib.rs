@@ -1,4 +1,5 @@
 pub mod errors;
+#[cfg(feature="http")]
 pub mod server;
 mod sqlite_store;
 pub mod types;

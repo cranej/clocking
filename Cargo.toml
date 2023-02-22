@@ -5,15 +5,20 @@ description = "A time hacking tool."
 edition = "2021"
 authors = ["Crane Jin <crane@cranejin.com>"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 chrono = { version = "0.4.23", features = ["std", "clock", "serde"] }
 clap = { version = "4.1.1", features = ["derive", "cargo"] }
 env_logger = "0.10.0"
 log = "0.4.17"
-pulldown-cmark = "0.9.2"
-rocket = { version = "0.5.0-rc.2", features = ["json"] }
 rusqlite = { version = "0.28.0", features = ["bundled"] }
-rust-embed = "6.4.2"
 serde = { version = "1.0.152", features = ["derive"] }
+pulldown-cmark = {version = "0.9.2", optional = true }
+rocket = { version = "0.5.0-rc.2", features = ["json"], optional = true }
+rust-embed = {version = "6.4.2", optional = true}
+
+[features]
+http = ["rocket", "pulldown-cmark"]
+
+[[bin]]
+name="clocking"
+required-features = ["http"]

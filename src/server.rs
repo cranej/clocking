@@ -1,4 +1,5 @@
 //! Rocket request handlers.
+#[cfg(feature = "http")]
 use crate::{types::EntryId, views, ClockingStore};
 use rocket::{
     get,
