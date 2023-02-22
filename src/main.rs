@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use clocking::{errors, new_sqlite_store, ClockingStore};
 use std::env;
 use std::io::{self, Write};
+use std::sync::{Arc, Mutex};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about, propagate_version = true)]
@@ -197,54 +198,16 @@ async fn main() -> Result<(), errors::Error> {
             let store = new_sqlite_store(&store_file);
             print_titles(&store.recent_titles(number)?, index);
         }
-        Commands::Server {
-            port,
-            addr,
-            verbose,
-        } => {
-            let config = rocket::config::Config {
-                port: port.unwrap_or(8080),
-                address: addr
-                    .unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))),
-                ..rocket::config::Config::default()
-            };
-
-            let server_config = clocking::server::ServerConfig {
-                db_file: store_file.clone(),
-            };
-
-            // TODO: move rocket initialization into lib, make handler private
-            let rocket = rocket::custom(&config)
-                .manage(server_config)
-                .mount(
-                    "/api",
-                    rocket::routes![
-                        clocking::server::api_recent,
-                        clocking::server::api_latest,
-                        clocking::server::api_unfinished,
-                        clocking::server::api_start,
-                        clocking::server::api_finish,
-                        clocking::server::api_report,
-                        clocking::server::api_report_by_date,
-                    ],
-                )
-                .mount(
-                    "/",
-                    rocket::routes![
-                        clocking::server::index,
-                        clocking::server::favicon,
-                        clocking::server::anyfile,
-                    ],
-                );
-
-            println!("Serve at: http://{}:{}", config.address, config.port);
-            if verbose {
-                println!("Registered routes:");
-                for r in rocket.routes() {
-                    println!("{r}");
-                }
-            }
-            let _ = rocket.ignite().await.unwrap().launch().await;
+        Commands::Server { port, addr, .. } => {
+            // TODO: understand why T is Send makes Mutex<T> both Send and Sync
+            let store = Arc::new(Mutex::new(new_sqlite_store(&store_file)));
+            let _ = clocking::server::launch_server(
+                port.unwrap_or(8080),
+                addr.unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))),
+                None,
+                store,
+            )
+            .await;
         }
     }
 
