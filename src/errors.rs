@@ -1,11 +1,17 @@
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
+    /// Unexpected error from underlying system, db, file system, etc.
     UnderlyingError(String),
+    /// Usually caused by corrupted underlying storage, which should not
+    /// happen if all operations are performed via this lib.
     ImpossibleState(String),
-    InvalidInput(String),
+    /// User input is invald.
+    InvalidInput(&'static str),
+    /// Unfinished entry exists when trying to start a new one.
     UnfinishedExists(String),
+    /// Entry with the same title and exact start time already exists.
     DuplicateEntry,
 }
 

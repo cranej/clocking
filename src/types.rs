@@ -1,6 +1,6 @@
 use crate::strify_duration;
 use chrono::prelude::*;
-#[cfg(feature="http")]
+#[cfg(feature = "http")]
 use pulldown_cmark::{html, Parser};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -55,7 +55,7 @@ pub struct FinishedEntry<'a> {
     pub notes: Cow<'a, str>,
 }
 
-#[cfg(feature="http")]
+#[cfg(feature = "http")]
 impl<'a> FinishedEntry<'a> {
     pub fn html_segment(&self) -> String {
         let text = format!(

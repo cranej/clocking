@@ -1,5 +1,5 @@
 pub mod errors;
-#[cfg(feature="http")]
+#[cfg(feature = "http")]
 pub mod server;
 mod sqlite_store;
 pub mod types;
@@ -84,13 +84,13 @@ pub trait ClockingStore {
     /// Note: `day_end` is included in the query range.
     fn finished_by_date_str(&self, day_start: &str, day_end: &str) -> Result<Vec<FinishedEntry>> {
         let start_date = NaiveDate::parse_from_str(day_start, NAIVE_DATE_FORMAT)
-            .map_err(|_| errors::Error::InvalidInput("Invalid format of day_start".to_string()))?;
+            .map_err(|_| errors::Error::InvalidInput("day_start"))?;
         let end_date = NaiveDate::parse_from_str(day_end, NAIVE_DATE_FORMAT)
-            .map_err(|_| errors::Error::InvalidInput("Invalid format of day_end".to_string()))?;
+            .map_err(|_| errors::Error::InvalidInput("day_end"))?;
 
         if end_date < start_date {
             Err(errors::Error::InvalidInput(
-                "Invalid date range: day_end must not before day_start".to_string(),
+                "day_end must not before day_start",
             ))
         } else {
             let today_naive = Local::now().date_naive();

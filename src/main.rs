@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand};
 use clocking::{errors, new_sqlite_store, ClockingStore};
 use std::env;
 use std::io::{self, Write};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about, propagate_version = true)]
@@ -200,7 +200,7 @@ async fn main() -> Result<(), errors::Error> {
         }
         Commands::Server { port, addr, .. } => {
             // TODO: understand why T is Send makes Mutex<T> both Send and Sync
-            let store = Arc::new(Mutex::new(new_sqlite_store(&store_file)));
+            let store = Box::new(Mutex::new(new_sqlite_store(&store_file)));
             let _ = clocking::server::launch_server(
                 port.unwrap_or(8080),
                 addr.unwrap_or_else(|| std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1))),

@@ -1,4 +1,4 @@
-//! Rocket request handlers.
+//! An optional http interface, requires feature **http**.
 #[cfg(feature = "http")]
 use crate::{types::EntryId, views, ClockingStore};
 use rocket::{
@@ -10,13 +10,13 @@ use rocket::{
 };
 use rust_embed::RustEmbed;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 #[derive(RustEmbed)]
 #[folder = "asset/"]
 struct Asset;
 
-type ServerConfig = Arc<Mutex<dyn ClockingStore + Send>>;
+type ServerConfig = Box<Mutex<dyn ClockingStore + Send>>;
 
 pub async fn launch_server(
     port: u16,
