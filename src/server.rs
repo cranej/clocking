@@ -44,7 +44,6 @@ pub async fn launch_server(
                 api_unfinished,
                 api_start,
                 api_finish,
-                api_report,
                 api_report_by_date,
             ],
         )
@@ -97,39 +96,12 @@ fn api_start(title: &str, config: &State<ServerConfig>) -> Status {
     }
 }
 
-#[post("/finish/<title>", data = "<notes>")]
-fn api_finish(title: &str, notes: String, config: &State<ServerConfig>) -> Status {
+#[post("/finish", data = "<notes>")]
+fn api_finish(notes: String, config: &State<ServerConfig>) -> Status {
     let mut store = config.lock().unwrap();
-    match store.try_finish_title(title, &notes) {
-        Ok(true) => Status::Ok,
-        Ok(false) => Status::NotFound,
+    match store.try_finish_any(&notes) {
+        Ok(_) => Status::Ok,
         Err(_) => Status::InternalServerError,
-    }
-}
-
-#[get("/report/<offset>/<days>?<view_type>")]
-fn api_report(
-    offset: u64,
-    days: Option<u64>,
-    view_type: &str,
-    config: &State<ServerConfig>,
-) -> String {
-    let store = config.lock().unwrap();
-    // TODO: remove unwrap
-    let entries = store.finished_by_offset(offset, days).unwrap();
-    if view_type == "daily" {
-        let view = views::DailySummaryView::new(&entries);
-        view.to_string()
-    } else if view_type == "detail" {
-        let view = views::EntryDetailView::new(&entries);
-        view.to_string()
-    } else if view_type == "dist" {
-        let view = views::DailyDistributionView::new(&entries);
-        view.to_string()
-    } else {
-        // default to view type 'daily_detail'
-        let view = views::DailyDetailView::new(&entries);
-        view.to_string()
     }
 }
 

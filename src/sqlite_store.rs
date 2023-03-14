@@ -126,25 +126,6 @@ impl ClockingStore for SqliteStore {
         }
     }
 
-    fn try_finish_title(&mut self, title: &str, notes: &str) -> Result<bool> {
-        let end_string = Utc::now().to_rfc3339();
-        self.conn
-            .execute(
-                "UPDATE clocking set end = ?, notes = IFNULL(notes, '')||? where id in (
-                    SELECT max(id) FROM clocking WHERE end is NULL and title = ?
-            )",
-                [&end_string, notes, title],
-            )
-            .map_err(|e| e.into())
-            .and_then(|n| match n {
-                0 => Ok(false),
-                1 => Ok(true),
-                _ => Err(Error::ImpossibleState(format!(
-                    "{n} rows updated! should be 1..."
-                ))),
-            })
-    }
-
     fn try_finish_any(&mut self, notes: &str) -> Result<Option<String>> {
         let end_string = Utc::now().to_rfc3339();
         self.conn
@@ -295,53 +276,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn sqlite_store_query() {
-        // TODO: rewrite as now it's impossible to have multiple unfinished entries
-    }
-
-    #[test]
-    fn test_finised_unfinished_by_title() {
-        // TODO: rewrite as now it's impossible to have multiple unfinished entries
-        /*
-        let mut mem_store = SqliteStore::new(IN_MEMORY);
-        let mut entries = gen_entries(6);
-        assert_eq!(entries.len(), 6);
-        entries[2].id.title = "Item 0".into();
-        entries[3].id.title = "Item 1".into();
-        entries[4].id.title = "Item 0".into();
-        entries[5].id.title = "Item 1".into();
-        // now there are three Item 0 and three Item 1 in collection
-        for entry in entries.iter() {
-            assert!(mem_store.start_entry(entry).is_ok());
-        }
-
-        //finish the fourth 1 , which is a "Item 1"
-        assert_eq!(&entries[3].id.title, "Item 1");
-        assert_eq!(mem_store.try_finish_entry_now(&entries[3].id, ""), Ok(true));
-
-        let r = mem_store.try_finish_title("Item 1", "");
-        assert_eq!(Ok(true), r);
-
-        // finish all 'Item 0'
-        let indices: &[usize] = &[0, 2, 4];
-        for i in indices.iter() {
-            assert_eq!(&entries[*i].id.title, "Item 0");
-        }
-        let end_data = gen_end_data(&entries, indices);
-        for (end_item, end_time) in end_data.iter() {
-            assert_eq!(mem_store.try_finish_entry(&end_item.id, end_time, ""), Ok(true));
-        }
-
-        // try finish Item 0 by title
-        let r = mem_store.try_finish_title("Item 0", "");
-        assert_eq!(Ok(false), r);
-
-        // try finish non-exist title
-        assert_eq!(Ok(false), mem_store.try_finish_title("non-exists", ""));
-        */
-    }
-
     fn gen_entries(count: usize) -> Vec<UnfinishedEntry<'static>> {
         let five_mins = chrono::Duration::minutes(5);
         (0..count)
@@ -356,34 +290,5 @@ mod tests {
                 }
             })
             .collect()
-    }
-
-    fn gen_end_data<'a>(
-        source: &'a [UnfinishedEntry<'a>],
-        indices: &[usize],
-    ) -> Vec<(&'a UnfinishedEntry<'a>, DateTime<Utc>)> {
-        let five_mins = chrono::Duration::minutes(5);
-        indices
-            .iter()
-            .map(|i| {
-                let item = &source[*i];
-                let end = item.id.start.checked_add_signed(five_mins).unwrap();
-                (item, end)
-            })
-            .collect()
-    }
-
-    fn gen_finished_entry<'a>(item: &'a UnfinishedEntry<'a>, new_note: &str) -> FinishedEntry<'a> {
-        let mut final_notes = item.notes.to_string();
-        final_notes.push_str(new_note);
-        FinishedEntry {
-            id: item.id.clone(),
-            end: item
-                .id
-                .start
-                .checked_add_signed(chrono::Duration::minutes(5))
-                .unwrap(),
-            notes: final_notes.into(),
-        }
     }
 }

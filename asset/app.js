@@ -57,7 +57,7 @@ createApp({
                    }).catch((err) => this.error = err))
         },
         async finish(title) {
-            let url = `/api/finish/${encodeURI(title)}`;
+            let url = `/api/finish/`;
             await (fetch(url, {method: 'POST', body: this.ongoing.get(title).notes})
                    .then((rep) => {
                        if (rep.ok) {

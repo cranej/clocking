@@ -30,12 +30,6 @@ enum Commands {
     },
     /// Finish latest unfinished clocking of title.
     Finish {
-        /// Title to finish. Choose interactively if not specified unless `--any/-a` specified.
-        title: Option<String>,
-        /// Don't expect a title, instead finish the latest one of any
-        /// unfinished entries.
-        #[arg(short, long, default_value_t = false)]
-        any: bool,
         /// Can be specified multiple times, each as a separate line. Sinel value '-' means read from stdin.
         #[arg(short, long)]
         notes: Vec<String>,
@@ -85,8 +79,6 @@ enum Commands {
         /// Default to 127.0.0.1
         #[arg(long, short)]
         addr: Option<std::net::IpAddr>,
-        #[arg(long, default_value_t = false)]
-        verbose: bool,
     },
 }
 
@@ -107,12 +99,12 @@ async fn main() -> Result<(), errors::Error> {
             let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT)?);
             match title {
                 Ok(title) => {
-                    let id = store.start(&title)?;
+                    let _ = store.start(&title)?;
                     println!("(Started)");
                     if !no_wait {
                         println!("(Ctrl-D to finish clocking)");
                         let notes = read_to_end();
-                        if store.try_finish_entry_now(&id, &notes)? {
+                        if store.try_finish_any(&notes).is_ok() {
                             println!("(Finished)");
                         } else {
                             return Err(errors::Error::ImpossibleState(
@@ -125,29 +117,17 @@ async fn main() -> Result<(), errors::Error> {
                 }
             };
         }
-        Commands::Finish { title, any, notes } => {
+        Commands::Finish { notes } => {
             let mut store = new_sqlite_store(&store_file);
             let notes = if notes.len() == 1 && notes[0] == "-" {
                 read_to_end()
             } else {
                 notes.join("\n")
             };
-            if !any {
-                let title = handle_title(title, &store.recent_titles(RECENT_TITLE_LIMIT)?);
-                match title {
-                    Ok(title) => match store.try_finish_title(&title, &notes) {
-                        Ok(true) => println!("(Updated)"),
-                        Ok(false) => println!("(No unfinished item found by {title})"),
-                        Err(e) => eprintln!("Unexpected error: {e}"),
-                    },
-                    Err(err) => eprintln!("Error reading or choosing title: {err}."),
-                }
-            } else {
-                match store.try_finish_any(&notes) {
-                    Ok(Some(title)) => println!("(Finished: {title})"),
-                    Ok(None) => println!("(No unfinished item found)"),
-                    Err(e) => eprintln!("Unexpected error: {e}"),
-                }
+            match store.try_finish_any(&notes) {
+                Ok(Some(title)) => println!("(Finished: {title})"),
+                Ok(None) => println!("(No unfinished item found)"),
+                Err(e) => eprintln!("Unexpected error: {e}"),
             }
         }
         Commands::Report {
@@ -198,7 +178,7 @@ async fn main() -> Result<(), errors::Error> {
             let store = new_sqlite_store(&store_file);
             print_titles(&store.recent_titles(number)?, index);
         }
-        Commands::Server { port, addr, .. } => {
+        Commands::Server { port, addr } => {
             // TODO: understand why T is Send makes Mutex<T> both Send and Sync
             let store = Box::new(Mutex::new(new_sqlite_store(&store_file)));
             let _ = clocking::server::launch_server(

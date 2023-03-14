@@ -35,23 +35,10 @@ pub trait ClockingStore {
     /// Start a clocking entry.
     fn start_entry(&mut self, entry: &UnfinishedEntry) -> Result<()>;
 
-    /// Try to finish the latest-started unfinished entry of given title.
-    ///
-    /// Returns Ok(false) if no such unfinished entry found.
-    fn try_finish_title(&mut self, title: &str, notes: &str) -> Result<bool>;
-
     /// Try to finish the latest-started unfinished entry.
     ///
     /// Returns Ok(None) if no such unfinished entry found.
     fn try_finish_any(&mut self, notes: &str) -> Result<Option<String>>;
-
-    /// Try to finish an unfinished clocking entry, set end datetime to now.
-    ///
-    /// Returns false if give entry is already finished or not found.
-    fn try_finish_entry_now(&mut self, id: &EntryId, notes: &str) -> Result<bool> {
-        let end = Utc::now();
-        self.try_finish_entry(id, &end, notes)
-    }
 
     /// Try to finish an unfinished clocking entry, set end datetime to `end`.
     ///
